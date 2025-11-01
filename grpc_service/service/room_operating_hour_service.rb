@@ -19,16 +19,18 @@ module Bannote
           def create_room_operating_hour(request, _call)
             authorize!("assistant")
 
+            # 1. gRPC Timestamp → Ruby Time 변환
             begin
-              opening_time = Time.parse(request.opening_time)
-              closing_time = Time.parse(request.closing_time)
-            rescue ArgumentError
+              opening_time = Time.at(request.opening_time.seconds)
+              closing_time = Time.at(request.closing_time.seconds)
+            rescue
               raise GRPC::BadStatus.new(
                 GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-                "Invalid time format for opening_time or closing_time. Expected HH:MM."
+                "Invalid Timestamp format for opening_time or closing_time"
               )
             end
 
+            # 2. 유효성 검증
             raise GRPC::BadStatus.new(
               GRPC::Core::StatusCodes::INVALID_ARGUMENT,
               "Opening time must be before closing time."
@@ -39,13 +41,15 @@ module Bannote
               "Room with ID #{request.room_id} not found."
             ) unless ::Room.exists?(request.room_id)
 
+            # 3. DB 저장 (datetime)
             new_operating_hour = ::RoomOperatingHour.create!(
               room_id: request.room_id,
               day_of_week: request.day_of_week,
-              opening_time: request.opening_time,
-              closing_time: request.closing_time,
+              opening_time: opening_time,
+              closing_time: closing_time,
             )
 
+            # 4. 응답 변환
             Bannote::Studyroomservice::Roomoperatinghour::V1::CreateRoomOperatingHourResponse.new(
               room_operating_hour: room_operating_hour_to_proto(new_operating_hour)
             )
@@ -89,16 +93,10 @@ module Bannote
 
             operating_hour = ::RoomOperatingHour.find(request.id)
 
-            if request.opening_time.present? && request.closing_time.present?
-              begin
-                opening_time = Time.parse(request.opening_time)
-                closing_time = Time.parse(request.closing_time)
-              rescue ArgumentError
-                raise GRPC::BadStatus.new(
-                  GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-                  "Invalid time format for opening_time or closing_time. Expected HH:MM."
-                )
-              end
+            # Timestamp → Time 변환
+            if request.opening_time&.seconds && request.closing_time&.seconds
+              opening_time = Time.at(request.opening_time.seconds)
+              closing_time = Time.at(request.closing_time.seconds)
 
               raise GRPC::BadStatus.new(
                 GRPC::Core::StatusCodes::INVALID_ARGUMENT,
@@ -107,10 +105,10 @@ module Bannote
             end
 
             operating_hour.update!(
-              room_id: request.room_id,
-              day_of_week: request.day_of_week,
-              opening_time: request.opening_time,
-              closing_time: request.closing_time
+              room_id: request.room_id.presence || operating_hour.room_id,
+              day_of_week: request.day_of_week.presence || operating_hour.day_of_week,
+              opening_time: opening_time || operating_hour.opening_time,
+              closing_time: closing_time || operating_hour.closing_time
             )
 
             Bannote::Studyroomservice::Roomoperatinghour::V1::UpdateRoomOperatingHourResponse.new(
@@ -123,15 +121,14 @@ module Bannote
           end
 
           # =========================================
-          # 5. 삭제
+          # 5. 삭제 (Soft delete)
           # =========================================
           def delete_room_operating_hour(request, _call)
             authorize!("admin")
 
             operating_hour = ::RoomOperatingHour.find(request.id)
-            operating_hour.update!(deleted_at: Time.now) # soft delete
+            operating_hour.update!(deleted_at: Time.current)
 
-            # 성공 응답
             Bannote::Studyroomservice::Roomoperatinghour::V1::DeleteRoomOperatingHourResponse.new(
               success: true,
               message: "Room operating hour deleted successfully"
@@ -148,7 +145,6 @@ module Bannote
               message: "Deletion failed: #{e.message}"
             )
           end
-
 
           # =========================================
           # 공통 메서드
@@ -167,13 +163,15 @@ module Bannote
             end
           end
 
+          # DB → Proto 변환
           def room_operating_hour_to_proto(operating_hour)
             Bannote::Studyroomservice::Roomoperatinghour::V1::RoomOperatingHour.new(
               id: operating_hour.id,
               room_id: operating_hour.room_id,
               day_of_week: operating_hour.day_of_week,
-              opening_time: operating_hour.opening_time.strftime("%H:%M"),
-              closing_time: operating_hour.closing_time.strftime("%H:%M"),
+              # 표시용은 HH:MM 으로 포맷, 실제 전달은 Timestamp
+              opening_time: Google::Protobuf::Timestamp.new(seconds: operating_hour.opening_time.to_i),
+              closing_time: Google::Protobuf::Timestamp.new(seconds: operating_hour.closing_time.to_i),
               created_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.created_at.to_i),
               updated_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.updated_at.to_i),
             )

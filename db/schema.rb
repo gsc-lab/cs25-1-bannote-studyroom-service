@@ -10,11 +10,11 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_01_122012) do
   create_table "reservations", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "room_id", null: false
-    t.datetime "start_time"
-    t.datetime "end_time"
+    t.datetime "start_time", null: false
+    t.datetime "end_time", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "group_id", null: false
@@ -35,24 +35,24 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
 
   create_table "room_exceptions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "room_id", null: false
-    t.date "holiday_date", null: false
+    t.date "exception_date", null: false
     t.string "reason", limit: 100
-    t.time "opening_time"
-    t.time "closing_time"
+    t.datetime "opening_time"
+    t.datetime "closing_time"
     t.bigint "created_by", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
-    t.index ["holiday_date"], name: "index_room_exceptions_on_holiday_date"
+    t.index ["exception_date"], name: "index_room_exceptions_on_exception_date"
     t.index ["room_id"], name: "index_room_exceptions_on_room_id"
   end
 
   create_table "room_operating_hours", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "room_id", null: false
     t.integer "day_of_week", limit: 1, null: false
-    t.time "opening_time", null: false
-    t.time "closing_time", null: false
-    t.time "day_maximum_time"
+    t.datetime "opening_time"
+    t.datetime "closing_time"
+    t.datetime "day_maximum_time"
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false

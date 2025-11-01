@@ -24,13 +24,18 @@ module Bannote
               "Room with ID #{request.room_id} not found."
             ) unless ::Room.exists?(request.room_id)
 
+            # ✅ Timestamp → Ruby Time 변환 (문자열인 경우도 안전하게 처리)
+            exception_time = if request.exception_date.respond_to?(:seconds)
+                              Time.at(request.exception_date.seconds)
+                            else
+                              Time.parse(request.exception_date.to_s) rescue nil
+                            end
+
             new_exception = ::RoomException.create!(
               room_id: request.room_id,
-              holiday_date: request.holiday_date,
-              reason: request.reason,
-              opening_time: request.opening_time,
-              closing_time: request.closing_time,
-              created_by: request.created_by
+              exception_date: exception_time,
+              is_closed: request.is_closed,
+              reason: request.reason
             )
 
             Bannote::Studyroomservice::Roomexception::V1::CreateRoomExceptionResponse.new(
@@ -41,7 +46,7 @@ module Bannote
           rescue ArgumentError
             raise GRPC::BadStatus.new(
               GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-              "Invalid date format for holiday_date. Expected YYYY-MM-DD."
+              "Invalid date format for exception_date."
             )
           end
 
@@ -82,10 +87,9 @@ module Bannote
             exception = ::RoomException.find(request.id)
             exception.update!(
               room_id: request.room_id,
-              holiday_date: request.holiday_date,
-              reason: request.reason,
-              opening_time: request.opening_time,
-              closing_time: request.closing_time
+              exception_date: Time.at(request.exception_date.seconds),
+              is_closed: request.is_closed,
+              reason: request.reason
             )
 
             Bannote::Studyroomservice::Roomexception::V1::UpdateRoomExceptionResponse.new(
@@ -95,11 +99,6 @@ module Bannote
             raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Room exception not found")
           rescue ActiveRecord::RecordInvalid => e
             raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, e.message)
-          rescue ArgumentError
-            raise GRPC::BadStatus.new(
-              GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-              "Invalid date format for holiday_date. Expected YYYY-MM-DD."
-            )
           end
 
           # =========================================
@@ -139,11 +138,9 @@ module Bannote
             Bannote::Studyroomservice::Roomexception::V1::RoomException.new(
               id: exception.id,
               room_id: exception.room_id,
-              holiday_date: exception.holiday_date.to_s,
+              exception_date: Google::Protobuf::Timestamp.new(seconds: exception.exception_date.to_i),
+              is_closed: exception.is_closed,
               reason: exception.reason,
-              opening_time: exception.opening_time.to_s,
-              closing_time: exception.closing_time.to_s,
-              created_by: exception.created_by,
               created_at: Google::Protobuf::Timestamp.new(seconds: exception.created_at.to_i),
               updated_at: Google::Protobuf::Timestamp.new(seconds: exception.updated_at.to_i)
             )

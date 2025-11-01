@@ -5,7 +5,7 @@ class RoomException < ApplicationRecord
   # 유효성 검사 (Validations)
   # room_id, holiday_date, created_by는 필수입니다.
   validates :room_id, presence: true
-  validates :holiday_date, presence: true
+  validates :exception_date, presence: true
   validates :created_by, presence: true
 
   # 소프트 삭제 (Soft Delete)
