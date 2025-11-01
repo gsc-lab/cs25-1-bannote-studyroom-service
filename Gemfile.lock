@@ -102,10 +102,10 @@ GEM
     google-protobuf (3.25.8-x86_64-linux)
     googleapis-common-protos-types (1.20.0)
       google-protobuf (>= 3.18, < 5.a)
-    grpc (1.75.0-x64-mingw-ucrt)
+    grpc (1.76.0-x64-mingw-ucrt)
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
-    grpc (1.75.0-x86_64-linux-gnu)
+    grpc (1.76.0-x86_64-linux-gnu)
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
     grpc-tools (1.75.0)
@@ -285,7 +285,7 @@ DEPENDENCIES
   brakeman
   debug
   google-protobuf (~> 3.25)
-  grpc (~> 1.57)
+  grpc (~> 1.76)
   grpc-tools
   mysql2 (~> 0.5)
   puma (>= 5.0)
