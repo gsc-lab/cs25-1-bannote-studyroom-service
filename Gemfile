@@ -17,7 +17,7 @@ gem "mysql2", "~> 0.5"
 # [gRPC & Protocol Buffers]
 # ======================================
 gem "grpc", "~> 1.57" # 특정 플랫폼 지정을 제거하고 Bundler가 현재 환경에 맞는 네이티브 gem을 설치하도록 합니다.
-gem "google-protobuf", "~> 3.25"
+gem "google-protobuf", "~> 4.33"
 gem "grpc-tools", require: false
 
 # ======================================
