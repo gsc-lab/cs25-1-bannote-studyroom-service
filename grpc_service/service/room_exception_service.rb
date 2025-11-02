@@ -19,23 +19,19 @@ module Bannote
           def create_room_exception(request, _call)
             authorize!("assistant")
 
+            # 존재하는 Room인지 확인
             raise GRPC::BadStatus.new(
               GRPC::Core::StatusCodes::NOT_FOUND,
               "Room with ID #{request.room_id} not found."
             ) unless ::Room.exists?(request.room_id)
 
-            # ✅ Timestamp → Ruby Time 변환 (문자열인 경우도 안전하게 처리)
-            exception_time = if request.exception_date.respond_to?(:seconds)
-                              Time.at(request.exception_date.seconds)
-                            else
-                              Time.parse(request.exception_date.to_s) rescue nil
-                            end
-
             new_exception = ::RoomException.create!(
               room_id: request.room_id,
-              exception_date: exception_time,
-              is_closed: request.is_closed,
-              reason: request.reason
+              exception_date: request.exception_date,   # 문자열 (YYYY-MM-DD)
+              reason: request.reason,
+              opening_time: request.opening_time.presence,
+              closing_time: request.closing_time.presence,
+              created_by: request.created_by
             )
 
             Bannote::Studyroomservice::Roomexception::V1::CreateRoomExceptionResponse.new(
@@ -46,7 +42,7 @@ module Bannote
           rescue ArgumentError
             raise GRPC::BadStatus.new(
               GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-              "Invalid date format for exception_date."
+              "Invalid format for exception_date (expected YYYY-MM-DD)."
             )
           end
 
@@ -85,11 +81,13 @@ module Bannote
             authorize!("assistant")
 
             exception = ::RoomException.find(request.id)
+
             exception.update!(
               room_id: request.room_id,
-              exception_date: Time.at(request.exception_date.seconds),
-              is_closed: request.is_closed,
-              reason: request.reason
+              exception_date: request.exception_date,
+              reason: request.reason,
+              opening_time: request.opening_time.presence,
+              closing_time: request.closing_time.presence
             )
 
             Bannote::Studyroomservice::Roomexception::V1::UpdateRoomExceptionResponse.new(
@@ -138,9 +136,11 @@ module Bannote
             Bannote::Studyroomservice::Roomexception::V1::RoomException.new(
               id: exception.id,
               room_id: exception.room_id,
-              exception_date: Google::Protobuf::Timestamp.new(seconds: exception.exception_date.to_i),
-              is_closed: exception.is_closed,
+              exception_date: exception.exception_date.to_s,  # 문자열 그대로 반환
               reason: exception.reason,
+              opening_time: exception.opening_time&.strftime("%H:%M"),
+              closing_time: exception.closing_time&.strftime("%H:%M"),
+              created_by: exception.created_by,
               created_at: Google::Protobuf::Timestamp.new(seconds: exception.created_at.to_i),
               updated_at: Google::Protobuf::Timestamp.new(seconds: exception.updated_at.to_i)
             )
