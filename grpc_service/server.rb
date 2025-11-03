@@ -64,7 +64,8 @@ module Bannote
         server.handle(Bannote::Studyroomservice::Reservation::V1::ReservationServiceHandler.new)
         server.handle(Bannote::Studyroomservice::Roomoperatinghour::V1::RoomOperatingHourServiceHandler.new)
         server.handle(Bannote::Studyroomservice::Roomexception::V1::RoomExceptionServiceHandler.new)
-        server.handle(Bannote::CommonService::Healthcheck::HealthServiceHandler)
+        server.handle(Bannote::CommonService::Healthcheck::HealthServiceHandler.new)
+
 
         puts "gRPC server listening on #{port}"
         server.run_till_terminated

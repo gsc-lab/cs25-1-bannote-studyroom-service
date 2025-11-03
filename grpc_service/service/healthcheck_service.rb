@@ -9,7 +9,7 @@ module Bannote
     module Healthcheck
       class HealthServiceHandler < ::Grpc::Health::V1::Health::Service
         def check(request, _call)
-          ::Grpc::Health::V1::HealthCheckResponse.new(status: "SERVING")
+          ::Grpc::Health::V1::HealthCheckResponse.new(status: :SERVING)
         end
       end
     end
