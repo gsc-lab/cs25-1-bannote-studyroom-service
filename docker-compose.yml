@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   # =========================================
-  # 1. MySQL Database
+  # 1. MySQL Database (로컬 개발용)
   # =========================================
   db:
     image: mysql:8.0
@@ -24,14 +24,13 @@ services:
   app:
     build: .
     container_name: studyroom_app
-    # Rails 웹서버(Puma) 대신 gRPC 서버만 실행
     command: bash -c "ruby grpc_service/server.rb"
     working_dir: /studyroom_service
     volumes:
       - .:/studyroom_service
       - /studyroom_service/tmp
     ports:
-      - "50053:50053"   # gRPC 포트만 노출
+      - "50052:50052"   # gRPC 포트
     depends_on:
       - db
       - redis
@@ -45,7 +44,15 @@ services:
       BUNDLE_DEPLOYMENT: 0
 
       # ---------------------------------
-      # Database 환경 변수
+      # gRPC 포트 및 클러스터 연결 환경
+      # ---------------------------------
+      GRPC_PORT: "50052"
+      REMOTE_DB_HOST: "mysql-user-service.mysql.svc.cluster.local"
+      REMOTE_DB_PORT: "3306"
+      REMOTE_DB_NAME: "user_service_db"
+
+      # ---------------------------------
+      # 로컬 DB 환경
       # ---------------------------------
       DB_HOST: db
       DB_PORT: "3306"
@@ -54,6 +61,11 @@ services:
       DB_NAME_PROD: studyroom_service_production
       DB_USERNAME: root
       DB_PASSWORD: 1234
+
+    secrets:
+      DB_USERNAME: ""
+      DB_PASSWORD: ""
+
     restart: always
 
   # =========================================
