@@ -30,7 +30,7 @@ services:
       - .:/studyroom_service
       - /studyroom_service/tmp
     ports:
-      - "50052:50052"   # gRPC 포트
+      - "50053:50053"   # gRPC 포트
     depends_on:
       - db
       - redis
@@ -46,7 +46,7 @@ services:
       # ---------------------------------
       # gRPC 포트 및 클러스터 연결 환경
       # ---------------------------------
-      GRPC_PORT: "50052"
+      GRPC_PORT: "50053"
       REMOTE_DB_HOST: "mysql-user-service.mysql.svc.cluster.local"
       REMOTE_DB_PORT: "3306"
       REMOTE_DB_NAME: "user_service_db"
