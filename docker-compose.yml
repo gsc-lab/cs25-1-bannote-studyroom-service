@@ -1,3 +1,4 @@
+version: "3.9"
 
 services:
   # =========================================
@@ -18,39 +19,33 @@ services:
       - mysql_data:/var/lib/mysql
 
   # =========================================
-  # 2. Rails Application (Studyroom Service)
+  # 2. Studyroom gRPC Application (Rails + gRPC)
   # =========================================
   app:
     build: .
     container_name: studyroom_app
-    command: bash -c "bundle exec rails s -b 0.0.0.0 -p 3000"
+    # Rails 웹서버(Puma) 대신 gRPC 서버만 실행
+    command: bash -c "ruby grpc_service/server.rb"
+    working_dir: /studyroom_service
     volumes:
       - .:/studyroom_service
       - /studyroom_service/tmp
-    working_dir: /studyroom_service
     ports:
-      - "3000:3000"     # Rails 웹 포트
-      - "50052:50052"   # gRPC 포트 (예: ReservationService 등)
+      - "50052:50052"   # gRPC 포트만 노출
     depends_on:
       - db
       - redis
       - kafka
     environment:
       # ---------------------------------
-      # Rails 기본 환경 설정
+      # Rails 기본 환경
       # ---------------------------------
       RAILS_ENV: development
-      RAILS_MAX_THREADS: 5
       RAILS_MASTER_KEY: de840449ba36702434883c58f5574809
       BUNDLE_DEPLOYMENT: 0
 
       # ---------------------------------
-      # gRPC 포트
-      # ---------------------------------
-      GRPC_PORT: "9090"
-
-      # ---------------------------------
-      # Database 환경 변수 (database.yml과 일치)
+      # Database 환경 변수
       # ---------------------------------
       DB_HOST: db
       DB_PORT: "3306"
