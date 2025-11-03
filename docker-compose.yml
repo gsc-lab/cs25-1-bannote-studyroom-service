@@ -62,10 +62,6 @@ services:
       DB_USERNAME: root
       DB_PASSWORD: 1234
 
-    secrets:
-      DB_USERNAME: ""
-      DB_PASSWORD: ""
-
     restart: always
 
   # =========================================
