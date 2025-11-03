@@ -8,4 +8,4 @@ RUN gem install bundler rails
 RUN bundle install
 
 EXPOSE 50053
-CMD ["rails", "server", "-b", "0.0.0.0"]
+CMD ["ruby", "grpc_service/server.rb"]

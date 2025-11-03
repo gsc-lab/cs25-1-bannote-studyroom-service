@@ -1,9 +1,6 @@
 version: "3.9"
 
 services:
-  # =========================================
-  # 1. MySQL Database (로컬 개발용)
-  # =========================================
   db:
     image: mysql:8.0
     container_name: studyroom_db
@@ -11,16 +8,11 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: studyroom_service_development
-      MYSQL_USER: root
-      MYSQL_PASSWORD: 1234
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
 
-  # =========================================
-  # 2. Studyroom gRPC Application (Rails + gRPC)
-  # =========================================
   app:
     build: .
     container_name: studyroom_app
@@ -30,30 +22,19 @@ services:
       - .:/studyroom_service
       - /studyroom_service/tmp
     ports:
-      - "50053:50053"   # gRPC 포트
+      - "50053:50053"
     depends_on:
       - db
       - redis
       - kafka
     environment:
-      # ---------------------------------
-      # Rails 기본 환경
-      # ---------------------------------
       RAILS_ENV: development
       RAILS_MASTER_KEY: de840449ba36702434883c58f5574809
       BUNDLE_DEPLOYMENT: 0
-
-      # ---------------------------------
-      # gRPC 포트 및 클러스터 연결 환경
-      # ---------------------------------
       GRPC_PORT: "50053"
       REMOTE_DB_HOST: "mysql-user-service.mysql.svc.cluster.local"
       REMOTE_DB_PORT: "3306"
       REMOTE_DB_NAME: "user_service_db"
-
-      # ---------------------------------
-      # 로컬 DB 환경
-      # ---------------------------------
       DB_HOST: db
       DB_PORT: "3306"
       DB_NAME_DEV: studyroom_service_development
@@ -61,12 +42,8 @@ services:
       DB_NAME_PROD: studyroom_service_production
       DB_USERNAME: root
       DB_PASSWORD: 1234
-
     restart: always
 
-  # =========================================
-  # 3. Redis
-  # =========================================
   redis:
     image: redis:7
     container_name: studyroom_redis
@@ -74,9 +51,6 @@ services:
     ports:
       - "6379:6379"
 
-  # =========================================
-  # 4. Zookeeper
-  # =========================================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: studyroom_zookeeper
@@ -87,9 +61,6 @@ services:
     ports:
       - "2181:2181"
 
-  # =========================================
-  # 5. Kafka
-  # =========================================
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: studyroom_kafka
@@ -105,8 +76,5 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-# =========================================
-# 6. Docker Volume (MySQL Data Persistence)
-# =========================================
 volumes:
   mysql_data:
