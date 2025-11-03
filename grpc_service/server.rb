@@ -57,7 +57,7 @@ module Bannote
 
         interceptors = [AuthInterceptor.new]
         server = GRPC::RpcServer.new(interceptors: interceptors)
-        port = '0.0.0.0:50052'
+        port = '0.0.0.0:50053'
         server.add_http2_port(port, :this_port_is_insecure)
 
         server.handle(Bannote::Studyroomservice::Room::V1::RoomServiceHandler.new)

@@ -31,7 +31,7 @@ services:
       - .:/studyroom_service
       - /studyroom_service/tmp
     ports:
-      - "50052:50052"   # gRPC 포트만 노출
+      - "50053:50053"   # gRPC 포트만 노출
     depends_on:
       - db
       - redis
