@@ -8,3 +8,5 @@ modules:
   #   name: buf.build/bannote/schedule-service
   - path: proto_export/studyroom
     name: buf.build/bannote/studyroom-service
+  - path: proto_export/common-service
+    name: buf.build/bannote/common-service
