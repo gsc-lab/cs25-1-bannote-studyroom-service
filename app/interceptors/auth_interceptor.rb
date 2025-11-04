@@ -1,4 +1,3 @@
-# app/interceptors/auth_interceptor.rb
 # frozen_string_literal: true
 
 require 'grpc'
@@ -11,17 +10,22 @@ class AuthInterceptor < GRPC::ServerInterceptor
   )
 
   def request_response(request:, call:, method:)
-    user_id = call.metadata['user-id']
+    user_id = call.metadata['user-id'] || call.metadata['user_id']
+    role = call.metadata['role']
 
     if user_id.nil? || user_id.empty?
       raise UNAUTHENTICATED
     end
 
-    # Rails 환경에서는 ActiveSupport::IsolatedExecution 불필요
+    # Context 설정
     Current.user_id = user_id
+    Current.role = role
+
+    puts "[AuthInterceptor] user_id=#{user_id}, role=#{role}"
+
     yield
   ensure
-    # 요청이 끝나면 Current 컨텍스트를 정리
-    Current.user_id = nil
+    # 요청 후 정리
+    Current.reset
   end
 end

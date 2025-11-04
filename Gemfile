@@ -16,27 +16,29 @@ gem "mysql2", "~> 0.5"
 # ======================================
 # [gRPC & Protocol Buffers]
 # ======================================
-gem "grpc", "~> 1.57" # 특정 플랫폼 지정을 제거하고 Bundler가 현재 환경에 맞는 네이티브 gem을 설치하도록 합니다.
-gem "google-protobuf", "~> 3.25"
-gem "grpc-tools", require: false
+gem "grpc", "~> 1.57"                # gRPC 통신용
+gem "google-protobuf", "~> 3.25"     # ProtoBuf 메시지용
+gem "grpc-tools", require: false     # .proto → Ruby 변환용 (buf generate 시 사용)
 
 # ======================================
-# [Background Jobs / Cache / Cable] (필요 시 유지)
+# [Background Jobs / Cache / Cable]
 # ======================================
 gem "solid_queue"
 gem "solid_cache"
 gem "solid_cable"
-gem "tzinfo-data"
+gem "tzinfo-data"                    # 윈도우 타임존 호환
+
+# ======================================
+# [ActiveSupport - Utility Helpers]
+# ======================================
+gem "activesupport", "~> 8.0"
 
 # ======================================
 # [Development & Test]
 # ======================================
 group :development, :test do
-  gem "debug", platforms: [:mri]
-  gem "brakeman", require: false
-  gem "rubocop-rails-omakase", require: false
+  gem "debug", platforms: [:mri]             # 디버깅
+  gem "brakeman", require: false             # 보안 점검
+  gem "rubocop-rails-omakase", require: false # 코드 스타일 검사
+  gem "dotenv-rails"                         # .env 자동 로드 (필수)
 end
-
-gem 'tzinfo-data'
-
-gem "activesupport", "~> 8.0"

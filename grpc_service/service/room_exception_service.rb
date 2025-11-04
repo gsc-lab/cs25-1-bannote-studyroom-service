@@ -141,8 +141,8 @@ module Bannote
               room_id: exception.room_id,
               holiday_date: exception.holiday_date.to_s,
               reason: exception.reason,
-              opening_time: exception.opening_time.to_s,
-              closing_time: exception.closing_time.to_s,
+              opening_time: exception.opening_time ? exception.opening_time.strftime('%H:%M') : nil,
+              closing_time: exception.closing_time ? exception.closing_time.strftime('%H:%M') : nil,
               created_by: exception.created_by,
               created_at: Google::Protobuf::Timestamp.new(seconds: exception.created_at.to_i),
               updated_at: Google::Protobuf::Timestamp.new(seconds: exception.updated_at.to_i)

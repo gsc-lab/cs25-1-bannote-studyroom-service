@@ -64,7 +64,9 @@ module Bannote
         puts "[gRPC] Using database host: #{ENV.fetch('DB_HOST', '(not set)')}"
 
         # 서버 초기화
-        server = GRPC::RpcServer.new
+        server = GRPC::RpcServer.new(
+          interceptors: [AuthInterceptor.new]
+        )
 
         # 포트 바인딩
         server.add_http2_port("0.0.0.0:#{grpc_port}", :this_port_is_insecure)

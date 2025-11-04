@@ -82,44 +82,42 @@ class Reservation < ApplicationRecord
 
   # 스터디룸 운영 시간 및 예외를 확인하여 예약 가능 여부를 반환합니다.
   def is_available_during_operating_hours?
-    # 요일별 운영 시간 확인
-    operating_hour = room.room_operating_hours.find_by(day_of_week: start_time.wday)
-
-    # 운영 시간이 설정되지 않았거나 소프트 삭제된 경우 예약 불가
-    return false if operating_hour.nil? || operating_hour.deleted_at.present?
-
-    # 예약 시작/종료 시간을 'HH:MM' 형식으로 변환
+    reservation_date = start_time.to_date
     start_time_str = start_time.strftime('%H:%M')
     end_time_str = end_time.strftime('%H:%M')
 
-    # 운영 시간도 'HH:MM' 형식으로 변환
-    opening_time_str = operating_hour.opening_time.strftime('%H:%M')
-    closing_time_str = operating_hour.closing_time.strftime('%H:%M')
+    # 1. 휴일/특별 운영 시간 확인 (RoomException)
+    room_exception = room.room_exceptions.find_by(holiday_date: reservation_date)
 
-    # 예약 시간이 운영 시간 내에 있는지 확인
-    unless start_time_str >= opening_time_str && end_time_str <= closing_time_str
+    if room_exception.present?
+      # Case 1: 휴무일 (opening_time과 closing_time이 모두 nil)
+      if room_exception.opening_time.nil? && room_exception.closing_time.nil?
+        return false # 휴무일이므로 예약 불가
+      end
+
+      # Case 2: 특별 운영 시간 (opening_time과 closing_time이 모두 존재)
+      if room_exception.opening_time.present? && room_exception.closing_time.present?
+        exception_opening_time_str = room_exception.opening_time.strftime('%H:%M')
+        exception_closing_time_str = room_exception.closing_time.strftime('%H:%M')
+        # 예약 시간이 특별 운영 시간 내에 있는지 확인하여 결과를 반환
+        return start_time_str >= exception_opening_time_str && end_time_str <= exception_closing_time_str
+      end
+
+      # Case 3: 데이터가 잘못된 경우 (시간이 하나만 있거나 하는 등)
       return false
     end
 
-    # 휴일 예외 확인
-    room_exception = room.room_exceptions.find_by(holiday_date: start_time.to_date)
+    # 2. 예외가 없는 경우, 요일별 정상 운영 시간 확인 (RoomOperatingHour)
+    operating_hour = room.room_operating_hours.find_by(day_of_week: start_time.wday)
 
-    if room_exception.present? && room_exception.deleted_at.nil?
-      if room_exception.opening_time.present? && room_exception.closing_time.present?
-        # 특별 운영 시간도 'HH:MM' 형식으로 변환
-        exception_opening_time_str = room_exception.opening_time.strftime('%H:%M')
-        exception_closing_time_str = room_exception.closing_time.strftime('%H:%M')
+    # 운영 시간이 설정되지 않았으면 예약 불가
+    return false if operating_hour.nil?
 
-        # 예약 시간이 특별 운영 시간 내에 있는지 확인
-        unless start_time_str >= exception_opening_time_str && end_time_str <= exception_closing_time_str
-          return false
-        end
-      else
-        # 특별 운영 시간이 없으면 휴일이므로 예약 불가
-        return false
-      end
-    end
+    # 정상 운영 시간 확인
+    opening_time_str = operating_hour.opening_time.strftime('%H:%M')
+    closing_time_str = operating_hour.closing_time.strftime('%H:%M')
 
-    true # 모든 조건을 통과하면 예약 가능
+    # 예약 시간이 정상 운영 시간 내에 있는지 확인하여 결과를 반환
+    start_time_str >= opening_time_str && end_time_str <= closing_time_str
   end
 end
