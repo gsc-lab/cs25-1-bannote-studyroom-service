@@ -1,18 +1,6 @@
 version: "3.9"
 
 services:
-  db:
-    image: mysql:8.0
-    container_name: studyroom_db
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: 1234
-      MYSQL_DATABASE: studyroom_service_development
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-
   app:
     build: .
     container_name: studyroom_app
@@ -22,27 +10,33 @@ services:
       - .:/studyroom_service
       - /studyroom_service/tmp
     ports:
-      - "50053:50053"
+      - "${GRPC_PORT:-50053}:${GRPC_PORT:-50053}"
     depends_on:
       - db
       - redis
       - kafka
     environment:
-      RAILS_ENV: development
-      RAILS_MASTER_KEY: de840449ba36702434883c58f5574809
-      BUNDLE_DEPLOYMENT: 0
-      GRPC_PORT: "50053"
-      REMOTE_DB_HOST: "mysql-user-service.mysql.svc.cluster.local"
-      REMOTE_DB_PORT: "3306"
-      REMOTE_DB_NAME: "user_service_db"
-      DB_HOST: db
-      DB_PORT: "3306"
-      DB_NAME_DEV: studyroom_service_development
-      DB_NAME_TEST: studyroom_service_test
-      DB_NAME_PROD: studyroom_service_production
-      DB_USERNAME: root
-      DB_PASSWORD: 1234
+      RAILS_ENV: ${RAILS_ENV}
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      GRPC_PORT: ${GRPC_PORT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME_DEV: ${DB_NAME_DEV}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
     restart: always
+
+  db:
+    image: mysql:8.0
+    container_name: studyroom_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: studyroom_service_development
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
 
   redis:
     image: redis:7

@@ -1,39 +1,24 @@
 # ============================================
-# Database Configuration
+# Database Configuration (Environment-driven)
 # ============================================
 
-# Environment variables
-env:
-  GRPC_PORT: "9090"
-  DB_HOST: "mysql-studyroom-service.mysql.svc.cluster.local"
-  DB_PORT: "3306"
-  DB_NAME_DEV: "studyroom_service_development"
-  DB_NAME_TEST: "studyroom_service_test"
-  DB_NAME_PROD: "studyroom_service_production"
-
-# Secrets
-secrets:
-  DB_USERNAME: "root"
-  DB_PASSWORD: "1234"
-
-# Rails ActiveRecord Settings
 default: &default
   adapter: mysql2
   encoding: utf8mb4
   pool: <%= ENV.fetch("RAILS_MAX_THREADS", 5) %>
-  username: <%= ENV.fetch("DB_USERNAME", "root") %>
-  password: <%= ENV.fetch("DB_PASSWORD", "1234") %>
-  host: <%= ENV.fetch("DB_HOST", "mysql-studyroom-service.mysql.svc.cluster.local") %>
-  port: <%= ENV.fetch("DB_PORT", 3306) %>
+  username: <%= ENV.fetch("DB_USERNAME") %>
+  password: <%= ENV.fetch("DB_PASSWORD") %>
+  host: <%= ENV.fetch("DB_HOST") %>
+  port: <%= ENV.fetch("DB_PORT") %>
 
 development:
   <<: *default
-  database: <%= ENV.fetch("DB_NAME_DEV", "studyroom_service_development") %>
+  database: <%= ENV.fetch("DB_NAME_DEV") %>
 
 test:
   <<: *default
-  database: <%= ENV.fetch("DB_NAME_TEST", "studyroom_service_test") %>
+  database: <%= ENV.fetch("DB_NAME_TEST") %>
 
 production:
   <<: *default
-  database: <%= ENV.fetch("DB_NAME_PROD", "studyroom_service_production") %>
+  database: <%= ENV.fetch("DB_NAME_PROD") %>
