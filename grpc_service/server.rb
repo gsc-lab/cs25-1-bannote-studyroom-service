@@ -47,7 +47,12 @@ require_relative 'service/room_exception_service'
 require_relative 'service/healthcheck_service'
 
 # =====================================================
-# 5. 서버 실행
+# 5. 인증 인터셉터 로드
+# =====================================================
+require_relative '../app/interceptors/auth_interceptor'
+
+# =====================================================
+# 6. 서버 실행
 # =====================================================
 module Bannote
   module Studyroomservice
@@ -60,9 +65,10 @@ module Bannote
         puts "[gRPC] Using database host: #{ENV.fetch('DB_HOST', '(not set)')}"
 
         # =====================================================
-        # 인증 인터셉터 제거 → 메타데이터 없이 호출 가능
+        # 인증 인터셉터 등록
         # =====================================================
-        server = GRPC::RpcServer.new
+        interceptors = [AuthInterceptor.new]
+        server = GRPC::RpcServer.new(interceptors: interceptors)
         server.add_http2_port("0.0.0.0:#{grpc_port}", :this_port_is_insecure)
 
         # =====================================================
@@ -93,6 +99,6 @@ module Bannote
 end
 
 # =====================================================
-# 6. 서버 시작
+# 7. 서버 시작
 # =====================================================
 Bannote::Studyroomservice::V1.start
