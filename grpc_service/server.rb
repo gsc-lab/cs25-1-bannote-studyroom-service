@@ -81,12 +81,33 @@ module Bannote
         puts "[gRPC] Successfully bound to 0.0.0.0:#{grpc_port}"
         puts "[gRPC] Waiting for incoming requests..."
 
-        # 종료 시그널 핸들링 (서버 안정 종료)
-        trap('INT') { server.stop }
-        trap('TERM') { server.stop }
+        # =====================================================
+        # 종료 시그널 안전 처리 (Thread-safe)
+        # =====================================================
+        stop_requested = false
+        trap('INT')  { stop_requested = true }
+        trap('TERM') { stop_requested = true }
 
-        # 서버 실행
-        server.run_till_terminated
+        # gRPC 서버 실행을 별도 스레드에서 수행
+        server_thread = Thread.new do
+          begin
+            server.run_till_terminated
+          rescue => e
+            STDERR.puts "[gRPC] Server thread error: #{e.class} - #{e.message}"
+            STDERR.puts e.backtrace.join("\n")
+          end
+        end
+
+        # 종료 감시 루프
+        until stop_requested
+          sleep 1
+        end
+
+        puts "[gRPC] Stopping server gracefully..."
+        server.stop
+        server_thread.join
+        puts "[gRPC] Server stopped cleanly."
+
       rescue => e
         STDERR.puts "[gRPC] Fatal error: #{e.class} - #{e.message}"
         STDERR.puts e.backtrace.join("\n")
