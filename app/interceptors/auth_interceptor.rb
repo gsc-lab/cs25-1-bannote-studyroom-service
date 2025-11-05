@@ -10,9 +10,20 @@ class AuthInterceptor < GRPC::ServerInterceptor
   )
 
   def request_response(request:, call:, method:)
+    # ============================================================
+    # [변경됨] HealthCheck 요청(Health.Check)은 인증 예외로 통과시킴
+    # ============================================================
+    if method.include?("Health.Check")
+      puts "[AuthInterceptor] Skipping authentication for Health.Check"
+      return yield
+    end
+    # ============================================================
+
+    # 메타데이터에서 user-id / role 추출
     user_id = call.metadata['user-id'] || call.metadata['user_id']
     role = call.metadata['role']
 
+    # 인증 실패 처리
     if user_id.nil? || user_id.empty?
       raise UNAUTHENTICATED
     end
@@ -25,7 +36,7 @@ class AuthInterceptor < GRPC::ServerInterceptor
 
     yield
   ensure
-    # 요청 후 정리
+    # 요청 후 Context 정리
     Current.reset
   end
 end
