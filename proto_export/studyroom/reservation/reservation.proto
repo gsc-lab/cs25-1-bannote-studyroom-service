@@ -4,7 +4,9 @@ package bannote.studyroomservice.reservation.v1;
 
 import "google/protobuf/timestamp.proto";
 
+// ===============================================
 // 예약 우선순위
+// ===============================================
 enum ReservationPriority {
   RESERVATION_PRIORITY_UNSPECIFIED = 0;
   RESERVATION_PRIORITY_LOW = 1;
@@ -12,7 +14,9 @@ enum ReservationPriority {
   RESERVATION_PRIORITY_HIGH = 3;
 }
 
+// ===============================================
 // 예약 상태 (optional, 향후 확장용)
+// ===============================================
 enum ReservationStatus {
   RESERVATION_STATUS_UNSPECIFIED = 0;
   RESERVATION_STATUS_CONFIRMED = 1;
@@ -20,10 +24,12 @@ enum ReservationStatus {
   RESERVATION_STATUS_COMPLETED = 3;
 }
 
-// 예약 정보
+// ===============================================
+// 예약 정보 (core model)
+// ===============================================
 message Reservation {
   int64 id = 1;
-  string code = 2;                            // 외부 식별용 코드 (UUID)
+  string code = 2;                            // 외부 식별용 코드 (UUID 또는 short-uuid)
   int64 room_id = 3;
   int64 group_id = 4;
   int64 link_id = 5;
@@ -31,13 +37,21 @@ message Reservation {
   google.protobuf.Timestamp end_time = 7;
   string purpose = 8;
   ReservationPriority priority = 9;
-  google.protobuf.Timestamp created_at = 10;
-  google.protobuf.Timestamp updated_at = 11;
-  google.protobuf.Timestamp deleted_at = 12;
-  ReservationStatus status = 13;              // optional
+  ReservationStatus status = 10;
+
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp deleted_at = 13;
+
+  // ✅ 추적용 (user-service 연동 대비)
+  string created_by = 14;
+  string updated_by = 15;
+  string deleted_by = 16;
 }
 
-// 생성
+// ===============================================
+// 1. 예약 생성
+// ===============================================
 message CreateReservationRequest {
   int64 room_id = 1;
   int64 group_id = 2;
@@ -52,16 +66,20 @@ message CreateReservationResponse {
   Reservation reservation = 1;
 }
 
-// 조회
+// ===============================================
+// 2. 예약 단건 조회
+// ===============================================
 message GetReservationRequest {
-  string code = 1;
+  string code = 1; // 예약 식별용 코드(UUID)
 }
 
 message GetReservationResponse {
   Reservation reservation = 1;
 }
 
-// 목록
+// ===============================================
+// 3. 예약 목록 조회
+// ===============================================
 message ListReservationsRequest {
   int64 room_id = 1;
   google.protobuf.Timestamp start_time_after = 2;
@@ -73,7 +91,9 @@ message ListReservationsResponse {
   repeated Reservation reservations = 1;
 }
 
-// 수정
+// ===============================================
+// 4. 예약 수정
+// ===============================================
 message UpdateReservationRequest {
   string code = 1;
   int64 room_id = 2;
@@ -83,13 +103,16 @@ message UpdateReservationRequest {
   google.protobuf.Timestamp end_time = 6;
   string purpose = 7;
   ReservationPriority priority = 8;
+  ReservationStatus status = 9; // optional
 }
 
 message UpdateReservationResponse {
   Reservation reservation = 1;
 }
 
-// 삭제
+// ===============================================
+// 5. 예약 삭제
+// ===============================================
 message DeleteReservationRequest {
   string code = 1;
 }

@@ -17,17 +17,19 @@ module Bannote
           # 1. 예약 생성
           # =========================================
           def create_reservation(request, _call)
+            puts "[DEBUG] create_reservation called, start_time=#{request.start_time.inspect}"
+
             authorize!("student")
 
             reservation = ::Reservation.new(
               room_id: request.room_id,
               group_id: request.group_id,
               link_id: request.link_id,
-              start_time: request.start_time.to_time,
-              end_time: request.end_time.to_time,
+              start_time: request.start_time ? Time.at(request.start_time.seconds) : nil,
+              end_time: request.end_time ? Time.at(request.end_time.seconds) : nil,
               purpose: request.purpose,
               priority: request.priority,
-              created_by: Current.user_id
+              created_by: Current.user_id || "user_admin"
             )
 
             reservation.save!
@@ -60,8 +62,8 @@ module Bannote
 
             reservations = ::Reservation.all
             reservations = reservations.where(room_id: request.room_id) if request.room_id.present?
-            reservations = reservations.where("start_time >= ?", request.start_time_after.to_time) if request.start_time_after.present?
-            reservations = reservations.where("end_time <= ?", request.end_time_before.to_time) if request.end_time_before.present?
+            reservations = reservations.where("start_time >= ?", Time.at(request.start_time_after.seconds)) if request.start_time_after&.seconds
+            reservations = reservations.where("end_time <= ?", Time.at(request.end_time_before.seconds)) if request.end_time_before&.seconds
             reservations = reservations.where(group_id: request.group_id) if request.group_id.present?
 
             Bannote::Studyroomservice::Reservation::V1::ListReservationsResponse.new(
@@ -87,8 +89,8 @@ module Bannote
               room_id: request.room_id,
               group_id: request.group_id,
               link_id: request.link_id,
-              start_time: request.start_time.to_time,
-              end_time: request.end_time.to_time,
+              start_time: request.start_time ? Time.at(request.start_time.seconds) : nil,
+              end_time: request.end_time ? Time.at(request.end_time.seconds) : nil,
               purpose: request.purpose,
               priority: request.priority,
               updated_by: Current.user_id

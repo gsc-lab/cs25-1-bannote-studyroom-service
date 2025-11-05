@@ -13,7 +13,7 @@ class AuthInterceptor < GRPC::ServerInterceptor
     # ============================================================
     # [변경됨] HealthCheck 요청(Health.Check)은 인증 예외로 통과시킴
     # ============================================================
-    if method.include?("Health.Check")
+    if method.to_s.include?("Health.Check")
       puts "[AuthInterceptor] Skipping authentication for Health.Check"
       return yield
     end
