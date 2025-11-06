@@ -2,21 +2,28 @@
 # frozen_string_literal: true
 
 require 'grpc'
+
+# =====================================================
+# 1. Rails 환경 로드
+# =====================================================
 require_relative '../config/environment'
 
 # =====================================================
-# 1. Rails autoloader 설정
+# 2. gRPC 관련 폴더를 Zeitwerk 자동 로드에서 제외
 # =====================================================
-Rails.autoloaders.main.ignore(Rails.root.join('app/grpc'))
+if defined?(Rails) && Rails.respond_to?(:autoloaders)
+  Rails.autoloaders.main.ignore(Rails.root.join('app/grpc'))
+  puts "[Rails] Ignored app/grpc directory from autoload & eager_load"
+end
 
 # =====================================================
-# 2. gRPC 파일 경로 등록
+# 3. gRPC 파일 경로 등록
 # =====================================================
 $LOAD_PATH.unshift(File.expand_path('../app/grpc', __dir__))
 $LOAD_PATH.unshift(File.expand_path('../app', __dir__))
 
 # =====================================================
-# 3. Proto 파일 로드
+# 4. Proto 파일 로드
 # =====================================================
 require 'room/room_pb'
 require 'room/service_pb'
@@ -38,7 +45,7 @@ require 'healthcheck/healthcheck_pb'
 require 'healthcheck/healthcheck_services_pb'
 
 # =====================================================
-# 4. 서비스 핸들러 로드
+# 5. 서비스 핸들러 로드
 # =====================================================
 require_relative 'service/room_service'
 require_relative 'service/reservation_service'
@@ -47,12 +54,12 @@ require_relative 'service/room_exception_service'
 require_relative 'service/healthcheck_service'
 
 # =====================================================
-# 5. 인증 인터셉터 로드
+# 6. 인증 인터셉터 로드
 # =====================================================
 require_relative '../app/interceptors/auth_interceptor'
 
 # =====================================================
-# 6. 서버 실행
+# 7. gRPC 서버 실행
 # =====================================================
 module Bannote
   module Studyroomservice
@@ -64,16 +71,10 @@ module Bannote
         puts "[gRPC] Environment: #{ENV.fetch('RAILS_ENV', 'development')}"
         puts "[gRPC] Using database host: #{ENV.fetch('DB_HOST', '(not set)')}"
 
-        # =====================================================
-        # 인증 인터셉터 등록
-        # =====================================================
         interceptors = [AuthInterceptor.new]
         server = GRPC::RpcServer.new(interceptors: interceptors)
         server.add_http2_port("0.0.0.0:#{grpc_port}", :this_port_is_insecure)
 
-        # =====================================================
-        # 서비스 핸들러 등록
-        # =====================================================
         server.handle(Bannote::Studyroomservice::Room::V1::RoomServiceHandler.new)
         server.handle(Bannote::Studyroomservice::Reservation::V1::ReservationServiceHandler.new)
         server.handle(Bannote::Studyroomservice::Roomoperatinghour::V1::RoomOperatingHourServiceHandler.new)
@@ -83,11 +84,7 @@ module Bannote
         puts "[gRPC] Successfully bound to 0.0.0.0:#{grpc_port}"
         puts "[gRPC] Waiting for incoming requests..."
 
-        # =====================================================
-        # 안전한 종료 (SIGINT / SIGTERM 시 종료)
-        # =====================================================
         server.run_till_terminated_or_interrupted(['INT', 'TERM'])
-
         puts "[gRPC] Server stopped cleanly."
       rescue => e
         STDERR.puts "[gRPC] Fatal error: #{e.class} - #{e.message}"
@@ -98,7 +95,4 @@ module Bannote
   end
 end
 
-# =====================================================
-# 7. 서버 시작
-# =====================================================
 Bannote::Studyroomservice::V1.start
