@@ -1,36 +1,33 @@
 require_relative "boot"
-
 require "rails/all"
 
-# Require the gems listed in Gemfile, including any gems
-# you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
 module StudyroomService
   class Application < Rails::Application
-    # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.0
 
-    # gRPC generated 파일은 Rails autoload 대상에서 제외
-    config.autoload_paths -= Dir["#{config.root}/app/grpc"]
-    config.eager_load_paths -= Dir["#{config.root}/app/grpc"]
+    # =====================================================
+    # gRPC 폴더 autoload / eager_load 완전 제외 (Rails 8 대응)
+    # =====================================================
+    initializer :ignore_grpc_from_autoloads, before: :set_autoload_paths do
+      grpc_path = Rails.root.join("app/grpc").to_s
 
-    # Please, add to the `ignore` list any other `lib` subdirectories that do
-    # not contain `.rb` files, or that should not be reloaded or eager loaded.
-    # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks])
+      if Dir.exist?(grpc_path)
+        Rails.autoloaders.each do |loader|
+          loader.ignore(grpc_path) # Zeitwerk autoloader 완전 제외
+        end
+        config.autoload_paths.delete(grpc_path)
+        config.eager_load_paths.delete(grpc_path)
+        puts "[Rails] Ignored app/grpc directory from autoload & eager_load"
+      else
+        puts "[Rails] app/grpc directory not found — skip ignore"
+      end
+    end
 
-    # Configuration for the application, engines, and railties goes here.
-    #
-    # These settings can be overridden in specific environments using the files
-    # in config/environments, which are processed later.
-    #
-    # config.time_zone = "Central Time (US & Canada)"
-    # config.eager_load_paths << Rails.root.join("extras")
-
-    # Only loads a smaller set of middleware suitable for API only apps.
-    # Middleware like session, flash, cookies can be added back manually.
-    # Skip views, helpers and assets when generating a new resource.
+    # =====================================================
+    # API 전용 설정
+    # =====================================================
     config.api_only = true
   end
 end

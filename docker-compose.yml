@@ -8,7 +8,7 @@ services:
       - .:/studyroom_service
       - /studyroom_service/tmp
     ports:
-      - "${GRPC_PORT:-50053}:${GRPC_PORT:-50053}"
+      - "9090:9090"
     depends_on:
       - db
     env_file:
@@ -22,7 +22,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: 1234
-      MYSQL_DATABASE: studyroom_service_development
+      MYSQL_DATABASE: ${DB_NAME:-studyroom_service_development}
     ports:
       - "3307:3306"
     volumes:
