@@ -1,10 +1,8 @@
-version: "3.9"
-
 services:
   app:
     build: .
     container_name: studyroom_app
-    command: bash -c "ruby grpc_service/server.rb"
+    command: bash -c "rm -f tmp/pids/server.pid && ruby grpc_service/server.rb"
     working_dir: /studyroom_service
     volumes:
       - .:/studyroom_service
@@ -13,17 +11,9 @@ services:
       - "${GRPC_PORT:-50053}:${GRPC_PORT:-50053}"
     depends_on:
       - db
-      - redis
-      - kafka
-    environment:
-      RAILS_ENV: ${RAILS_ENV}
-      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
-      GRPC_PORT: ${GRPC_PORT}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_NAME_DEV: ${DB_NAME_DEV}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
+    env_file:
+      - .env
+      - .env.${RAILS_ENV}
     restart: always
 
   db:

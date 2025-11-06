@@ -11,3 +11,12 @@ default: &default
   host: <%= ENV.fetch("DB_HOST") %>
   port: <%= ENV.fetch("DB_PORT") %>
   database: <%= ENV.fetch("DB_NAME") %>
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default
