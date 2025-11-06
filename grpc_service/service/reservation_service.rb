@@ -21,15 +21,17 @@ module Bannote
 
             authorize!("student")
 
+            start_time = request.start_time&.seconds ? Time.at(request.start_time.seconds) : nil
+            end_time = request.end_time&.seconds ? Time.at(request.end_time.seconds) : nil
+
             reservation = ::Reservation.new(
               room_id: request.room_id,
               group_id: request.group_id,
               link_id: request.link_id,
-              start_time: request.start_time ? Time.at(request.start_time.seconds) : nil,
-              end_time: request.end_time ? Time.at(request.end_time.seconds) : nil,
+              start_time: start_time,
+              end_time: end_time,
               purpose: request.purpose,
-              priority: request.priority,
-              created_by: Current.user_id || "user_admin"
+              priority: request.priority
             )
 
             reservation.save!
@@ -92,8 +94,7 @@ module Bannote
               start_time: request.start_time ? Time.at(request.start_time.seconds) : nil,
               end_time: request.end_time ? Time.at(request.end_time.seconds) : nil,
               purpose: request.purpose,
-              priority: request.priority,
-              updated_by: Current.user_id
+              priority: request.priority
             )
 
             Bannote::Studyroomservice::Reservation::V1::UpdateReservationResponse.new(
@@ -119,7 +120,7 @@ module Bannote
               )
             end
 
-            reservation.update!(deleted_at: Time.now, deleted_by: Current.user_id)
+            reservation.update!(deleted_at: Time.now)
 
             Bannote::Studyroomservice::Reservation::V1::DeleteReservationResponse.new(success: true)
           rescue ActiveRecord::RecordNotFound
@@ -131,7 +132,6 @@ module Bannote
           # =========================================
           private
 
-          # 권한 검증 단축 메서드
           def authorize!(min_role)
             unless SimulatedUserRoles.has_authority?(
               Current.user_id,
@@ -144,15 +144,11 @@ module Bannote
             end
           end
 
-          # 수정 / 삭제 가능 여부 판정
           def can_modify?(reservation, user_level)
             return true if user_level >= SimulatedUserRoles::AUTHORITY_LEVELS["assistant"]
-            return true if user_level >= SimulatedUserRoles::AUTHORITY_LEVELS["student"] &&
-                           reservation.created_by == Current.user_id
             false
           end
 
-          # Reservation → Proto 변환
           def reservation_to_proto(reservation)
             Bannote::Studyroomservice::Reservation::V1::Reservation.new(
               id: reservation.id,
@@ -166,8 +162,7 @@ module Bannote
               priority: reservation.priority,
               created_at: Google::Protobuf::Timestamp.new(seconds: reservation.created_at.to_i),
               updated_at: Google::Protobuf::Timestamp.new(seconds: reservation.updated_at.to_i),
-              deleted_at: reservation.deleted_at ? Google::Protobuf::Timestamp.new(seconds: reservation.deleted_at.to_i) : nil,
-              created_by: reservation.created_by
+              deleted_at: reservation.deleted_at ? Google::Protobuf::Timestamp.new(seconds: reservation.deleted_at.to_i) : nil
             )
           end
         end

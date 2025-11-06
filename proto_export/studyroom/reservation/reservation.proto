@@ -42,11 +42,6 @@ message Reservation {
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
   google.protobuf.Timestamp deleted_at = 13;
-
-  // ✅ 추적용 (user-service 연동 대비)
-  string created_by = 14;
-  string updated_by = 15;
-  string deleted_by = 16;
 }
 
 // ===============================================

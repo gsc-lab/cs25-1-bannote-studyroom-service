@@ -21,9 +21,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
     t.bigint "link_id"
     t.string "purpose", null: false
     t.integer "priority", null: false
-    t.bigint "created_by", null: false
-    t.bigint "updated_by"
-    t.bigint "deleted_by"
     t.datetime "deleted_at"
     t.bigint "user_id"
     t.string "code", null: false

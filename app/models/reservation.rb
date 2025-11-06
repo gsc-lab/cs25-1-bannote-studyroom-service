@@ -17,7 +17,6 @@ class Reservation < ApplicationRecord
   validates :group_id, presence: true
   validates :purpose, presence: true
   validates :priority, presence: true
-  validates :created_by, presence: true
   validates :start_time, presence: true
   validates :end_time, presence: true
   validate :start_time_before_end_time
@@ -30,8 +29,8 @@ class Reservation < ApplicationRecord
   # ========================================
   # Soft delete method
   # ========================================
-  def soft_delete(deleted_by: nil)
-    update(deleted_at: Time.current, deleted_by: deleted_by)
+  def soft_delete
+    update(deleted_at: Time.current)
   end
 
   def self.with_deleted
