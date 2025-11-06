@@ -10,4 +10,4 @@ default: &default
   password: <%= ENV.fetch("DB_PASSWORD") %>
   host: <%= ENV.fetch("DB_HOST") %>
   port: <%= ENV.fetch("DB_PORT") %>
-  port: <%= ENV.fetch("DB_NAME") %>
+  database: <%= ENV.fetch("DB_NAME") %>
