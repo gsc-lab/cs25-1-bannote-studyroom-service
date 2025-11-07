@@ -19,14 +19,5 @@ test:
   <<: *default
 
 production:
-  primary:
-    <<: *default
-  cable:
-    <<: *default
-    database: studyroom_service_cable_production
-  cache:
-    <<: *default
-    database: studyroom_service_cache_production
-  queue:
-    <<: *default
-    database: studyroom_service_queue_production
+  <<: *default
+  
