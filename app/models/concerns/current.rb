@@ -1,8 +1,11 @@
+# frozen_string_literal: true
+
 module Current
-  thread_mattr_accessor :user_id, :role
+  thread_mattr_accessor :user_code
+  thread_mattr_accessor :user_role
 
   def self.reset
-    self.user_id = nil
-    self.role = nil
+    self.user_code = nil
+    self.user_role = nil
   end
 end

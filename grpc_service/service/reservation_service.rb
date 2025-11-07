@@ -5,7 +5,6 @@ require 'reservation/service_pb'
 require 'reservation/service_services_pb'
 
 require_relative '../../app/models/concerns/current'
-require_relative '../../app/models/concerns/simulated_user_roles'
 
 module Bannote
   module Studyroomservice
@@ -17,7 +16,7 @@ module Bannote
           # 1. 예약 생성
           # =========================================
           def create_reservation(request, _call)
-            puts "[DEBUG] create_reservation called, start_time=#{request.start_time.inspect}"
+            puts "[DEBUG] create_reservation called by #{Current.user_code} (role: #{Current.user_role})"
 
             authorize!("student")
 
@@ -31,7 +30,8 @@ module Bannote
               start_time: start_time,
               end_time: end_time,
               purpose: request.purpose,
-              priority: request.priority
+              priority: request.priority,
+              created_by: Current.user_code # 실제 user-service 메타데이터 반영
             )
 
             reservation.save!
@@ -77,13 +77,13 @@ module Bannote
           # 4. 예약 수정
           # =========================================
           def update_reservation(request, _call)
-            reservation = ::Reservation.find_by!(code: request.code)
-            user_authority_level = SimulatedUserRoles.get_authority_level(Current.user_id)
+            authorize!("student")
 
-            unless can_modify?(reservation, user_authority_level)
+            reservation = ::Reservation.find_by!(code: request.code)
+            unless can_modify?(Current.user_role)
               raise GRPC::BadStatus.new(
                 GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Insufficient authority to update this reservation."
+                "Permission denied: role #{Current.user_role} cannot modify this reservation."
               )
             end
 
@@ -94,7 +94,8 @@ module Bannote
               start_time: request.start_time ? Time.at(request.start_time.seconds) : nil,
               end_time: request.end_time ? Time.at(request.end_time.seconds) : nil,
               purpose: request.purpose,
-              priority: request.priority
+              priority: request.priority,
+              updated_by: Current.user_code
             )
 
             Bannote::Studyroomservice::Reservation::V1::UpdateReservationResponse.new(
@@ -110,17 +111,20 @@ module Bannote
           # 5. 예약 삭제
           # =========================================
           def delete_reservation(request, _call)
-            reservation = ::Reservation.find_by!(code: request.code)
-            user_authority_level = SimulatedUserRoles.get_authority_level(Current.user_id)
+            authorize!("student")
 
-            unless can_modify?(reservation, user_authority_level)
+            reservation = ::Reservation.find_by!(code: request.code)
+            unless can_modify?(Current.user_role)
               raise GRPC::BadStatus.new(
                 GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Insufficient authority to delete this reservation."
+                "Permission denied: role #{Current.user_role} cannot delete this reservation."
               )
             end
 
-            reservation.update!(deleted_at: Time.now)
+            reservation.update!(
+              deleted_at: Time.now,
+              deleted_by: Current.user_code
+            )
 
             Bannote::Studyroomservice::Reservation::V1::DeleteReservationResponse.new(success: true)
           rescue ActiveRecord::RecordNotFound
@@ -132,21 +136,23 @@ module Bannote
           # =========================================
           private
 
+          # 최소 역할 권한 검증 (student, assistant, professor, admin 등)
           def authorize!(min_role)
-            unless SimulatedUserRoles.has_authority?(
-              Current.user_id,
-              SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
-            )
+            hierarchy = %w[student doorkeeper class_rep assistant professor admin]
+            user_role = Current.user_role.to_s.split(',').map(&:strip)
+            min_index = hierarchy.index(min_role)
+            valid = user_role.any? { |r| hierarchy.index(r) && hierarchy.index(r) >= min_index }
+
+            unless valid
               raise GRPC::BadStatus.new(
                 GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Requires #{min_role.capitalize} authority or higher."
+                "Permission denied: requires #{min_role} or higher"
               )
             end
           end
 
-          def can_modify?(reservation, user_level)
-            return true if user_level >= SimulatedUserRoles::AUTHORITY_LEVELS["assistant"]
-            false
+          def can_modify?(role)
+            %w[assistant professor admin].any? { |r| role.to_s.include?(r) }
           end
 
           def reservation_to_proto(reservation)
