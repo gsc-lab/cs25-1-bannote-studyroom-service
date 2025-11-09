@@ -8,7 +8,7 @@ RUN gem install bundler rails
 RUN bundle install
 
 # Install grpc-health-probe
-RUN wget -qO/bin/grpc-health-probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc-health-probe-linux-amd64 && \
+RUN curl -sSL -o /bin/grpc-health-probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/latest/download/grpc-health-probe-linux-amd64 && \
     chmod +x /bin/grpc-health-probe
 
 EXPOSE 50053
