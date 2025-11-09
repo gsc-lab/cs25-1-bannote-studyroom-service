@@ -1,8 +1,6 @@
 require "active_support/core_ext/integer/time"
 
 Rails.application.configure do
-
-  gem "solid_queue", require: false
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Code is not reloaded between requests.
@@ -45,10 +43,14 @@ Rails.application.configure do
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
 
-  # Replace the default in-process memory cache store with a durable alternative.
-  config.cache_store = :solid_cache_store
+  # =====================================
+  # [Cache / Job queue 설정]
+  # =====================================
 
-  # Replace the default in-process and non-durable queuing backend for Active Job.
+  # ✅ 캐시 스토어를 memory_store 로 변경
+  config.cache_store = :memory_store
+
+  # ✅ solid_queue 관련 설정 완전 제거
   # config.active_job.queue_adapter = :solid_queue
   # config.solid_queue.connects_to = { database: { writing: :queue } }
 
@@ -86,7 +88,6 @@ Rails.application.configure do
   #
   # Skip DNS rebinding protection for the default health check endpoint.
   # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
-  config.active_record.dump_schema_after_migration = false
 
   # ================================
   # [gRPC 관련 파일 autoload 제외 설정]
