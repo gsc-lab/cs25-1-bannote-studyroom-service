@@ -47,10 +47,10 @@ Rails.application.configure do
   # [Cache / Job queue 설정]
   # =====================================
 
-  # ✅ 캐시 스토어를 memory_store 로 변경
+  # 캐시 스토어를 memory_store 로 변경
   config.cache_store = :memory_store
 
-  # ✅ solid_queue 관련 설정 완전 제거
+  # solid_queue 관련 설정 완전 제거
   # config.active_job.queue_adapter = :solid_queue
   # config.solid_queue.connects_to = { database: { writing: :queue } }
 
