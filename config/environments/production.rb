@@ -86,4 +86,9 @@ Rails.application.configure do
   # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
   config.active_record.dump_schema_after_migration = false
 
+  # ================================
+  # [gRPC 관련 파일 autoload 제외 설정]
+  # ================================
+  config.autoload_paths -= Dir["#{Rails.root}/app/grpc/**"]
+  config.eager_load_paths -= Dir["#{Rails.root}/app/grpc/**"]
 end
