@@ -3,9 +3,13 @@ FROM ruby:3.2
 WORKDIR /rails
 COPY . /rails
 
-RUN apt-get update -qq && apt-get install -y build-essential libpq-dev nodejs default-mysql-client
+RUN apt-get update -qq && apt-get install -y build-essential libpq-dev nodejs default-mysql-client wget
 RUN gem install bundler rails
 RUN bundle install
+
+# Install grpc-health-probe
+RUN wget -qO/bin/grpc-health-probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc-health-probe-linux-amd64 && \
+    chmod +x /bin/grpc-health-probe
 
 EXPOSE 50053
 CMD ["ruby", "grpc_service/server.rb"]
