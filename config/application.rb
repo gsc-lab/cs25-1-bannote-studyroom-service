@@ -29,5 +29,11 @@ module StudyroomService
     # API 전용 설정
     # =====================================================
     config.api_only = true
+
+    # =====================================================
+    # ActionCable 완전 비활성화 (solid_cable 관련 오류 방지)
+    # =====================================================
+    config.action_cable.mount_path = nil
+    config.action_cable.disable_request_forgery_protection = true
   end
 end
