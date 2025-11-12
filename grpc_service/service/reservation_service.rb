@@ -5,6 +5,7 @@ require 'reservation/service_pb'
 require 'reservation/service_services_pb'
 
 require_relative '../../app/models/concerns/current'
+require_relative '../../app/models/concerns/simulated_user_roles'
 
 module Bannote
   module Studyroomservice
@@ -31,7 +32,7 @@ module Bannote
               end_time: end_time,
               purpose: request.purpose,
               priority: request.priority,
-              created_by: Current.user_code # 실제 user-service 메타데이터 반영
+              created_by: Current.user_code # 메타데이터 기반 user_code 사용
             )
 
             reservation.save!
@@ -136,17 +137,15 @@ module Bannote
           # =========================================
           private
 
-          # 최소 역할 권한 검증 (student, assistant, professor, admin 등)
+          # 최소 역할 권한 검증 (SimulatedUserRoles 기반)
           def authorize!(min_role)
-            hierarchy = %w[student doorkeeper class_rep assistant professor admin]
-            user_role = Current.user_role.to_s.split(',').map(&:strip)
-            min_index = hierarchy.index(min_role)
-            valid = user_role.any? { |r| hierarchy.index(r) && hierarchy.index(r) >= min_index }
-
-            unless valid
+            unless SimulatedUserRoles.has_authority?(
+              Current.user_code,
+              SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
+            )
               raise GRPC::BadStatus.new(
                 GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: requires #{min_role} or higher"
+                "Permission denied: Requires #{min_role.capitalize} authority or higher."
               )
             end
           end

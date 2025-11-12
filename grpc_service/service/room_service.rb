@@ -18,7 +18,7 @@ module Bannote
           # =========================================
           def create_room(request, _call)
             unless SimulatedUserRoles.has_authority?(
-              Current.user_id,
+              Current.user_code,
               SimulatedUserRoles::AUTHORITY_LEVELS["assistant"]
             )
               raise GRPC::BadStatus.new(
@@ -35,10 +35,9 @@ module Bannote
                 name: request.name,
                 maximum_member: request.maximum_member,
                 status: request.status,
-                created_by: Current.user_id
+                created_by: Current.user_code
               )
 
-              # proto 구조에 맞게 수정 — CreateRoomResponse는 room 필드만 가짐
               Bannote::Studyroomservice::Room::V1::CreateRoomResponse.new(
                 room: room_to_proto(room)
               )
@@ -110,15 +109,10 @@ module Bannote
           # 5. 방 삭제
           # =========================================
           def delete_room(request, _call)
-            # authorize!("assistant")
-
             room = ::Room.find(request.id)
-            # user_authority_level = SimulatedUserRoles.get_authority_level(Current.user_id)
-
-            # if user_authority_level >= SimulatedUserRoles::AUTHORITY_LEVELS["admin"] ||
-            #    (user_authority_level >= SimulatedUserRoles::AUTHORITY_LEVELS["assistant"] &&
-            #     room.created_by == Current.user_id)
-            #   room.destroy!
+            # TODO: 추후 권한 검증 추가 예정
+            # if SimulatedUserRoles.has_authority?(Current.user_code, SimulatedUserRoles::AUTHORITY_LEVELS["assistant"])
+            #   room.destroy! if room.created_by == Current.user_code
             # else
             #   raise GRPC::BadStatus.new(
             #     GRPC::Core::StatusCodes::PERMISSION_DENIED,
@@ -126,7 +120,7 @@ module Bannote
             #   )
             # end
 
-            room.destroy! # 이거 검증 넣을때는 이거 삭제 해야함.
+            room.destroy!
 
             Bannote::Studyroomservice::Room::V1::DeleteRoomResponse.new
 
@@ -142,7 +136,7 @@ module Bannote
           # 권한 검증 단축 메서드
           def authorize!(min_role)
             unless SimulatedUserRoles.has_authority?(
-              Current.user_id,
+              Current.user_code,
               SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
             )
               raise GRPC::BadStatus.new(

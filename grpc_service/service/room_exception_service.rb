@@ -30,7 +30,7 @@ module Bannote
               reason: request.reason,
               opening_time: request.opening_time,
               closing_time: request.closing_time,
-              created_by: request.created_by
+              created_by: Current.user_code # 수정됨: 요청자 코드 기록
             )
 
             Bannote::Studyroomservice::Roomexception::V1::CreateRoomExceptionResponse.new(
@@ -125,7 +125,7 @@ module Bannote
 
           def authorize!(min_role)
             unless SimulatedUserRoles.has_authority?(
-              Current.user_id,
+              Current.user_code, # 수정됨: user_id → user_code
               SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
             )
               raise GRPC::BadStatus.new(

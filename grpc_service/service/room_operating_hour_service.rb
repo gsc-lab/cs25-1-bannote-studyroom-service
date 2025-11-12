@@ -43,7 +43,7 @@ module Bannote
               room_id: request.room_id,
               day_of_week: request.day_of_week,
               opening_time: request.opening_time,
-              closing_time: request.closing_time,
+              closing_time: request.closing_time
             )
 
             Bannote::Studyroomservice::Roomoperatinghour::V1::CreateRoomOperatingHourResponse.new(
@@ -131,7 +131,6 @@ module Bannote
             operating_hour = ::RoomOperatingHour.find(request.id)
             operating_hour.update!(deleted_at: Time.now) # soft delete
 
-            # 성공 응답
             Bannote::Studyroomservice::Roomoperatinghour::V1::DeleteRoomOperatingHourResponse.new(
               success: true,
               message: "Room operating hour deleted successfully"
@@ -149,7 +148,6 @@ module Bannote
             )
           end
 
-
           # =========================================
           # 공통 메서드
           # =========================================
@@ -157,7 +155,7 @@ module Bannote
 
           def authorize!(min_role)
             unless SimulatedUserRoles.has_authority?(
-              Current.user_id,
+              Current.user_code, # user_id → user_code 로 수정
               SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
             )
               raise GRPC::BadStatus.new(
@@ -175,7 +173,7 @@ module Bannote
               opening_time: operating_hour.opening_time.strftime("%H:%M"),
               closing_time: operating_hour.closing_time.strftime("%H:%M"),
               created_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.created_at.to_i),
-              updated_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.updated_at.to_i),
+              updated_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.updated_at.to_i)
             )
           end
         end
