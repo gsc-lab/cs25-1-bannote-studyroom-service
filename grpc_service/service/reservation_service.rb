@@ -31,8 +31,7 @@ module Bannote
               start_time: start_time,
               end_time: end_time,
               purpose: request.purpose,
-              priority: request.priority,
-              created_by: Current.user_code # 메타데이터 기반 user_code 사용
+              priority: request.priority
             )
 
             reservation.save!
@@ -95,8 +94,7 @@ module Bannote
               start_time: request.start_time ? Time.at(request.start_time.seconds) : nil,
               end_time: request.end_time ? Time.at(request.end_time.seconds) : nil,
               purpose: request.purpose,
-              priority: request.priority,
-              updated_by: Current.user_code
+              priority: request.priority
             )
 
             Bannote::Studyroomservice::Reservation::V1::UpdateReservationResponse.new(
@@ -122,10 +120,7 @@ module Bannote
               )
             end
 
-            reservation.update!(
-              deleted_at: Time.now,
-              deleted_by: Current.user_code
-            )
+            reservation.update!(deleted_at: Time.now)
 
             Bannote::Studyroomservice::Reservation::V1::DeleteReservationResponse.new(success: true)
           rescue ActiveRecord::RecordNotFound
