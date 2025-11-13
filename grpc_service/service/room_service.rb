@@ -17,33 +17,29 @@ module Bannote
           # 1. 방 생성
           # =========================================
           def create_room(request, _call)
-            unless SimulatedUserRoles.has_authority?(
-              Current.user_code,
-              SimulatedUserRoles::AUTHORITY_LEVELS["assistant"]
-            )
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Requires Assistant authority or higher to create a room."
-              )
-            end
+            authorize!("assistant")
 
             begin
-              puts "[INFO] CreateRoom request: #{request.inspect}"
-
-              room = ::Room.create!(
-                department_code: request.department_code.to_s,
+              room = ::Room.new(
+                department_code: request.department_code.present? ? request.department_code.to_s : nil,
                 name: request.name,
                 maximum_member: request.maximum_member,
                 status: request.status,
                 created_by: Current.user_code
               )
 
+              room.save!
+
               Bannote::Studyroomservice::Room::V1::CreateRoomResponse.new(
                 room: room_to_proto(room)
               )
 
+            rescue ActiveRecord::RecordInvalid => e
+              raise GRPC::BadStatus.new(
+                GRPC::Core::StatusCodes::INVALID_ARGUMENT,
+                e.record.errors.full_messages.join(", ")
+              )
             rescue => e
-              puts "[ERROR] #{e.class}: #{e.message}"
               raise GRPC::BadStatus.new(
                 GRPC::Core::StatusCodes::INTERNAL,
                 "Failed to create room: #{e.message}"
@@ -57,14 +53,13 @@ module Bannote
           def get_room(request, _call)
             authorize!("student")
 
-            room = ::Room.find(request.id)
+            room = ::Room.find_by(id: request.id)
+            raise_not_found if room.nil?
+            raise_not_found if room.deleted_at.present?
 
             Bannote::Studyroomservice::Room::V1::GetRoomResponse.new(
               room: room_to_proto(room)
             )
-
-          rescue ActiveRecord::RecordNotFound
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Room not found")
           end
 
           # =========================================
@@ -73,7 +68,7 @@ module Bannote
           def list_rooms(_request, _call)
             authorize!("student")
 
-            rooms = ::Room.all
+            rooms = ::Room.where(deleted_at: nil)
 
             Bannote::Studyroomservice::Room::V1::ListRoomsResponse.new(
               rooms: rooms.map { |room| room_to_proto(room) }
@@ -86,46 +81,45 @@ module Bannote
           def update_room(request, _call)
             authorize!("assistant")
 
-            room = ::Room.find(request.id)
+            room = ::Room.find_by(id: request.id)
+            raise_not_found if room.nil?
+            raise_not_found if room.deleted_at.present?
 
-            room.update!(
-              department_code: request.department_code.to_s,
-              name: request.name,
-              maximum_member: request.maximum_member,
-              status: request.status
-            )
+            begin
+              room.update!(
+                department_code: request.department_code.present? ?
+                                  request.department_code.to_s :
+                                  room.department_code,
+                name: request.name || room.name,
+                maximum_member: request.maximum_member || room.maximum_member,
+                status: request.status
+              )
 
-            Bannote::Studyroomservice::Room::V1::UpdateRoomResponse.new(
-              room: room_to_proto(room)
-            )
+              Bannote::Studyroomservice::Room::V1::UpdateRoomResponse.new(
+                room: room_to_proto(room)
+              )
 
-          rescue ActiveRecord::RecordNotFound
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Room not found")
-          rescue ActiveRecord::RecordInvalid => e
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, e.message)
+            rescue ActiveRecord::RecordInvalid => e
+              raise GRPC::BadStatus.new(
+                GRPC::Core::StatusCodes::INVALID_ARGUMENT,
+                e.record.errors.full_messages.join(", ")
+              )
+            end
           end
 
           # =========================================
-          # 5. 방 삭제
+          # 5. 방 삭제 (Soft Delete)
           # =========================================
           def delete_room(request, _call)
-            room = ::Room.find(request.id)
-            # TODO: 추후 권한 검증 추가 예정
-            # if SimulatedUserRoles.has_authority?(Current.user_code, SimulatedUserRoles::AUTHORITY_LEVELS["assistant"])
-            #   room.destroy! if room.created_by == Current.user_code
-            # else
-            #   raise GRPC::BadStatus.new(
-            #     GRPC::Core::StatusCodes::PERMISSION_DENIED,
-            #     "Permission denied: Insufficient authority to delete this room."
-            #   )
-            # end
+            authorize!("assistant")
 
-            room.destroy!
+            room = ::Room.find_by(id: request.id)
+            raise_not_found if room.nil?
+            raise_not_found if room.deleted_at.present?
+
+            room.update!(deleted_at: Time.now)
 
             Bannote::Studyroomservice::Room::V1::DeleteRoomResponse.new
-
-          rescue ActiveRecord::RecordNotFound
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Room not found")
           end
 
           # =========================================
@@ -146,11 +140,18 @@ module Bannote
             end
           end
 
+          def raise_not_found
+            raise GRPC::BadStatus.new(
+              GRPC::Core::StatusCodes::NOT_FOUND,
+              "Room not found"
+            )
+          end
+
           # Room → Proto 변환
           def room_to_proto(room)
             Bannote::Studyroomservice::Room::V1::Room.new(
               id: room.id,
-              department_code: room.department_code,
+              department_code: room.department_code.to_s,
               name: room.name,
               maximum_member: room.maximum_member,
               status: room.status,

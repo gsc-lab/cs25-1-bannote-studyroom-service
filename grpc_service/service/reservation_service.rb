@@ -21,9 +21,78 @@ module Bannote
 
             authorize!("student")
 
+            # -------------------------------
+            # 1) 시간 파싱 + 기본 검증
+            # -------------------------------
             start_time = request.start_time&.seconds ? Time.at(request.start_time.seconds) : nil
-            end_time = request.end_time&.seconds ? Time.at(request.end_time.seconds) : nil
+            end_time   = request.end_time&.seconds ? Time.at(request.end_time.seconds) : nil
 
+            raise_invalid("start_time is required") unless start_time
+            raise_invalid("end_time is required") unless end_time
+            raise_invalid("start_time must be earlier than end_time") if start_time >= end_time
+
+            # -------------------------------
+            # 2) Room 존재 여부 + 삭제 여부
+            # -------------------------------
+            room = ::Room.find_by(id: request.room_id)
+            raise_not_found("Room") unless room
+            raise_precondition("Cannot reserve a deleted room") if room.deleted_at.present?
+
+            # -------------------------------
+            # 3) department_code 매칭 검증
+            # -------------------------------
+            if room.department_code.present? && room.department_code != Current.department_code
+              raise_permission("Cannot reserve a room belonging to another department")
+            end
+
+            # -------------------------------
+            # 4) 운영시간 체크
+            # -------------------------------
+            op = ::RoomOperatingHour.where(room_id: room.id, day_of_week: start_time.wday, deleted_at: nil).first
+            raise_precondition("No operating hour defined for this day") unless op
+
+            op_start = Time.parse(op.opening_time.strftime("%H:%M"))
+            op_end   = Time.parse(op.closing_time.strftime("%H:%M"))
+
+            unless start_time >= op_start && end_time <= op_end
+              raise_precondition("Reservation time is outside operating hours")
+            end
+
+            # -------------------------------
+            # 5) 휴일(RoomException) 체크
+            # -------------------------------
+            exception = ::RoomException.where(room_id: room.id, holiday_date: start_time.to_date, deleted_at: nil).first
+
+            if exception
+              # 완전 휴일
+              if exception.opening_time.nil? && exception.closing_time.nil?
+                raise_precondition("Reservation not allowed: Entire day is marked as holiday")
+              end
+
+              # 부분 휴일
+              if exception.opening_time.present? && exception.closing_time.present?
+                ex_start = Time.parse(exception.opening_time.strftime("%H:%M"))
+                ex_end   = Time.parse(exception.closing_time.strftime("%H:%M"))
+
+                # 예외 구간과 겹치면 예약 불가
+                if (start_time < ex_end) && (end_time > ex_start)
+                  raise_precondition("Reservation time conflicts with room exception period")
+                end
+              end
+            end
+
+            # -------------------------------
+            # 6) 기존 예약과 시간 중복 체크
+            # -------------------------------
+            overlap = ::Reservation.where(room_id: room.id, deleted_at: nil)
+                                   .where("start_time < ? AND end_time > ?", end_time, start_time)
+                                   .exists?
+
+            raise_precondition("Reservation time overlaps with an existing reservation") if overlap
+
+            # -------------------------------
+            # 최종 저장
+            # -------------------------------
             reservation = ::Reservation.new(
               room_id: request.room_id,
               group_id: request.group_id,
@@ -35,11 +104,13 @@ module Bannote
             )
 
             reservation.save!
+
             Bannote::Studyroomservice::Reservation::V1::CreateReservationResponse.new(
               reservation: reservation_to_proto(reservation)
             )
+
           rescue ActiveRecord::RecordInvalid => e
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, e.message)
+            raise_invalid(e.message)
           end
 
           # =========================================
@@ -49,11 +120,13 @@ module Bannote
             authorize!("student")
 
             reservation = ::Reservation.find_by!(code: request.code)
+            raise_not_found("Reservation") if reservation.deleted_at.present?
+
             Bannote::Studyroomservice::Reservation::V1::GetReservationResponse.new(
               reservation: reservation_to_proto(reservation)
             )
           rescue ActiveRecord::RecordNotFound
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Reservation not found")
+            raise_not_found("Reservation")
           end
 
           # =========================================
@@ -62,7 +135,7 @@ module Bannote
           def list_reservations(request, _call)
             authorize!("student")
 
-            reservations = ::Reservation.all
+            reservations = ::Reservation.where(deleted_at: nil)
             reservations = reservations.where(room_id: request.room_id) if request.room_id.present?
             reservations = reservations.where("start_time >= ?", Time.at(request.start_time_after.seconds)) if request.start_time_after&.seconds
             reservations = reservations.where("end_time <= ?", Time.at(request.end_time_before.seconds)) if request.end_time_before&.seconds
@@ -80,19 +153,34 @@ module Bannote
             authorize!("student")
 
             reservation = ::Reservation.find_by!(code: request.code)
-            unless can_modify?(Current.user_role)
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: role #{Current.user_role} cannot modify this reservation."
-              )
-            end
+            raise_not_found("Reservation") if reservation.deleted_at.present?
+            raise_permission("role #{Current.user_role} cannot modify this reservation") unless can_modify?(Current.user_role)
+
+            # 시간 파싱 + 역전 체크
+            start_time = request.start_time ? Time.at(request.start_time.seconds) : reservation.start_time
+            end_time   = request.end_time   ? Time.at(request.end_time.seconds)   : reservation.end_time
+
+            raise_invalid("start_time must be earlier than end_time") if start_time >= end_time
+
+            # Room 변경 시 재검증
+            room = ::Room.find_by(id: request.room_id || reservation.room_id)
+            raise_not_found("Room") unless room
+            raise_precondition("Cannot reserve a deleted room") if room.deleted_at.present?
+
+            # 중복 체크 (자기 제외)
+            overlap = ::Reservation.where(room_id: room.id, deleted_at: nil)
+                                   .where("start_time < ? AND end_time > ?", end_time, start_time)
+                                   .where.not(id: reservation.id)
+                                   .exists?
+
+            raise_precondition("Reservation time overlaps with an existing reservation") if overlap
 
             reservation.update!(
               room_id: request.room_id,
               group_id: request.group_id,
               link_id: request.link_id,
-              start_time: request.start_time ? Time.at(request.start_time.seconds) : nil,
-              end_time: request.end_time ? Time.at(request.end_time.seconds) : nil,
+              start_time: start_time,
+              end_time: end_time,
               purpose: request.purpose,
               priority: request.priority
             )
@@ -101,9 +189,9 @@ module Bannote
               reservation: reservation_to_proto(reservation)
             )
           rescue ActiveRecord::RecordNotFound
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Reservation not found")
+            raise_not_found("Reservation")
           rescue ActiveRecord::RecordInvalid => e
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, e.message)
+            raise_invalid(e.message)
           end
 
           # =========================================
@@ -113,18 +201,14 @@ module Bannote
             authorize!("student")
 
             reservation = ::Reservation.find_by!(code: request.code)
-            unless can_modify?(Current.user_role)
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: role #{Current.user_role} cannot delete this reservation."
-              )
-            end
+            raise_not_found("Reservation") if reservation.deleted_at.present?
+            raise_permission("role #{Current.user_role} cannot delete this reservation") unless can_modify?(Current.user_role)
 
             reservation.update!(deleted_at: Time.now)
 
             Bannote::Studyroomservice::Reservation::V1::DeleteReservationResponse.new(success: true)
           rescue ActiveRecord::RecordNotFound
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Reservation not found")
+            raise_not_found("Reservation")
           end
 
           # =========================================
@@ -132,21 +216,33 @@ module Bannote
           # =========================================
           private
 
-          # 최소 역할 권한 검증 (SimulatedUserRoles 기반)
           def authorize!(min_role)
             unless SimulatedUserRoles.has_authority?(
               Current.user_code,
               SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
             )
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Requires #{min_role.capitalize} authority or higher."
-              )
+              raise_permission("Requires #{min_role.capitalize} authority or higher.")
             end
           end
 
           def can_modify?(role)
             %w[assistant professor admin].any? { |r| role.to_s.include?(r) }
+          end
+
+          def raise_not_found(name)
+            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "#{name} not found")
+          end
+
+          def raise_invalid(message)
+            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, message)
+          end
+
+          def raise_precondition(message)
+            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::FAILED_PRECONDITION, message)
+          end
+
+          def raise_permission(message)
+            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, message)
           end
 
           def reservation_to_proto(reservation)
