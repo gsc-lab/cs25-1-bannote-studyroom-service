@@ -10,7 +10,15 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_17_144418) do
+  create_table "departments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_departments_on_code", unique: true
+  end
+
   create_table "reservations", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "room_id", null: false
     t.datetime "start_time"
@@ -70,6 +78,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
     t.bigint "created_by"
     t.string "department_name"
     t.string "department_code"
+    t.bigint "department_id", null: false
+    t.index ["department_id"], name: "index_rooms_on_department_id"
   end
 
   add_foreign_key "reservations", "rooms"
