@@ -5,6 +5,7 @@ source "https://rubygems.org"
 # ======================================
 gem "rails", "~> 8.0.3"
 gem "bootsnap", require: false
+gem "puma", "~> 6.4"
 
 # ======================================
 # [Database]
@@ -21,8 +22,8 @@ gem "grpc-tools", require: false
 # ======================================
 # [Utility]
 # ======================================
-gem "tzinfo-data"                    # (윈도우 개발 시만 필요)
-gem "dotenv-rails"                   # 환경변수 관리용
+gem "tzinfo-data"
+gem "dotenv-rails"
 
 # ======================================
 # [Development & Test]
