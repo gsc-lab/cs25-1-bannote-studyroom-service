@@ -31,7 +31,7 @@ module Bannote
             begin
               room = ::Room.new(
                 department_code: request.department_code.present? ? request.department_code.to_s : nil,
-                department_name: request.department_name.present? ? request.department_name.to_s : nil,
+                department_name: request.department_name.to_s.strip.presence,
                 name: request.name,
                 maximum_member: request.maximum_member,
                 status: request.status,
@@ -170,6 +170,7 @@ module Bannote
             Bannote::Studyroomservice::Room::V1::Room.new(
               id: room.id,
               department_code: room.department_code.to_s,
+              department_name: room.department_name.to_s,
               name: room.name,
               maximum_member: room.maximum_member,
               status: room.status,

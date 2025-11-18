@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_11_17_144418) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_18_162059) do
   create_table "departments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "name", null: false
     t.string "code", null: false
@@ -55,9 +55,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_17_144418) do
   create_table "room_operating_hours", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "room_id", null: false
     t.integer "day_of_week", limit: 1, null: false
-    t.time "opening_time", null: false
-    t.time "closing_time", null: false
-    t.time "day_maximum_time"
+    t.string "opening_time", null: false
+    t.string "closing_time", null: false
+    t.string "day_maximum_time"
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -76,10 +76,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_17_144418) do
     t.integer "status"
     t.integer "capacity"
     t.bigint "created_by"
-    t.string "department_name"
     t.string "department_code"
-    t.bigint "department_id", null: false
-    t.index ["department_id"], name: "index_rooms_on_department_id"
+    t.string "department_name"
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_rooms_on_deleted_at"
   end
 
   add_foreign_key "reservations", "rooms"

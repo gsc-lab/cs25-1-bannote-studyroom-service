@@ -33,13 +33,14 @@ module Bannote
             raise_precondition("Cannot add operating hours to a deleted room.") if room.deleted_at.present?
 
             if ::RoomOperatingHour.where(
-              room_id: request.room_id,
-              day_of_week: request.day_of_week,
-              deleted_at: nil
-            ).exists?
+                room_id: request.room_id,
+                day_of_week: request.day_of_week,
+                deleted_at: nil
+              ).exists?
               raise_already_exists("Operating hours for this day already exist.")
             end
 
+            # time 검증만 time.parse로 하고 DB에는 string 저장
             begin
               opening_time = Time.parse(request.opening_time)
               closing_time = Time.parse(request.closing_time)
@@ -52,8 +53,9 @@ module Bannote
             operating_hour = ::RoomOperatingHour.create!(
               room_id: request.room_id,
               day_of_week: request.day_of_week,
-              opening_time: request.opening_time,
-              closing_time: request.closing_time,
+              opening_time: request.opening_time,    # 그대로 문자열 저장
+              closing_time: request.closing_time,    # 그대로 문자열 저장
+              day_maximum_time: request.day_maximum_time,  # 이거 추가된 경우
               created_by: Current.user_code
             )
 
@@ -64,6 +66,7 @@ module Bannote
           rescue ActiveRecord::RecordInvalid => e
             raise_invalid(e.message)
           end
+
 
           # =========================================
           # 2. 단일 조회
@@ -212,13 +215,13 @@ module Bannote
               id: operating_hour.id,
               room_id: operating_hour.room_id,
               day_of_week: operating_hour.day_of_week,
-              opening_time: operating_hour.opening_time.strftime("%H:%M"),
-              closing_time: operating_hour.closing_time.strftime("%H:%M"),
+              opening_time: operating_hour.opening_time.to_s,  # string으로 반환
+              closing_time: operating_hour.closing_time.to_s,  # string으로 반환
+              day_maximum_time: operating_hour.day_maximum_time.to_s, # 있으면 추가
               created_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.created_at.to_i),
               updated_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.updated_at.to_i)
             )
           end
-
         end
       end
     end
