@@ -5,7 +5,6 @@ require 'room_operating_hour/service_pb'
 require 'room_operating_hour/service_services_pb'
 
 require_relative '../../app/models/concerns/current'
-require_relative '../../app/models/concerns/simulated_user_roles'
 
 module Bannote
   module Studyroomservice
@@ -13,20 +12,26 @@ module Bannote
       module V1
         class RoomOperatingHourServiceHandler < Bannote::Studyroomservice::Roomoperatinghour::V1::RoomOperatingHourService::Service
           
+          # -------------------------------------------------------
+          # ROLE PRIORITY TABLE
+          # -------------------------------------------------------
+          ROLE_PRIORITY = {
+            "student"   => 1,
+            "assistant" => 2,
+            "professor" => 3,
+            "admin"     => 4
+          }.freeze
+          
           # =========================================
           # 1. 운영시간 생성
           # =========================================
           def create_room_operating_hour(request, _call)
             authorize!("assistant")
 
-            # 방 존재 여부 + 삭제 여부 확인 추가
             room = ::Room.find_by(id: request.room_id)
             raise_not_found("Room") unless room
-            if room.deleted_at.present?
-              raise_precondition("Cannot add operating hours to a deleted room.")
-            end
+            raise_precondition("Cannot add operating hours to a deleted room.") if room.deleted_at.present?
 
-            # 요일 중복 추가
             if ::RoomOperatingHour.where(
               room_id: request.room_id,
               day_of_week: request.day_of_week,
@@ -44,15 +49,16 @@ module Bannote
 
             raise_invalid("Opening time must be before closing time.") if opening_time >= closing_time
 
-            new_operating_hour = ::RoomOperatingHour.create!(
+            operating_hour = ::RoomOperatingHour.create!(
               room_id: request.room_id,
               day_of_week: request.day_of_week,
               opening_time: request.opening_time,
-              closing_time: request.closing_time
+              closing_time: request.closing_time,
+              created_by: Current.user_code
             )
 
             Bannote::Studyroomservice::Roomoperatinghour::V1::CreateRoomOperatingHourResponse.new(
-              room_operating_hour: room_operating_hour_to_proto(new_operating_hour)
+              room_operating_hour: room_operating_hour_to_proto(operating_hour)
             )
 
           rescue ActiveRecord::RecordInvalid => e
@@ -89,7 +95,7 @@ module Bannote
           end
 
           # =========================================
-          # 4. 수정
+          # 4. 운영시간 수정
           # =========================================
           def update_room_operating_hour(request, _call)
             authorize!("assistant")
@@ -98,12 +104,10 @@ module Bannote
             raise_not_found("Room operating hour") unless operating_hour
             raise_precondition("Cannot update deleted operating hour.") if operating_hour.deleted_at.present?
 
-            # 방이 삭제된 방이면 수정도 금지
             room = ::Room.find_by(id: request.room_id)
             raise_not_found("Room") unless room
             raise_precondition("Cannot modify operating hours of a deleted room.") if room.deleted_at.present?
 
-            # 요일 중복 방지 (day_of_week를 수정하는 경우)
             if request.day_of_week.present? &&
                request.day_of_week != operating_hour.day_of_week &&
                ::RoomOperatingHour.where(
@@ -114,7 +118,6 @@ module Bannote
               raise_already_exists("Operating hours for this day already exist.")
             end
 
-            # 시간 역전 체크
             if request.opening_time.present? && request.closing_time.present?
               begin
                 opening_time = Time.parse(request.opening_time)
@@ -164,14 +167,14 @@ module Bannote
           # =========================================
           private
 
-          def authorize!(min_role)
-            unless SimulatedUserRoles.has_authority?(
-              Current.user_code,
-              SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
-            )
+          # ---- role 기반 통일 authorize ----
+          def authorize!(required_role)
+            user_role = Current.user_role.to_s
+
+            unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]
               raise GRPC::BadStatus.new(
                 GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Requires #{min_role.capitalize} authority or higher."
+                "Permission denied: Requires #{required_role.capitalize} authority or higher."
               )
             end
           end
@@ -215,6 +218,7 @@ module Bannote
               updated_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.updated_at.to_i)
             )
           end
+
         end
       end
     end

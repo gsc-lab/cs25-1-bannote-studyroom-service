@@ -5,13 +5,22 @@ require 'room/service_pb'
 require 'room/service_services_pb'
 
 require_relative '../../app/models/concerns/current'
-require_relative '../../app/models/concerns/simulated_user_roles'
 
 module Bannote
   module Studyroomservice
     module Room
       module V1
         class RoomServiceHandler < Bannote::Studyroomservice::Room::V1::RoomService::Service
+
+          # -------------------------------------------------------
+          # ROLE PRIORITY TABLE
+          # -------------------------------------------------------
+          ROLE_PRIORITY = {
+            "student"   => 1,
+            "assistant" => 2,
+            "professor" => 3,
+            "admin"     => 4
+          }.freeze
 
           # =========================================
           # 1. 방 생성
@@ -22,6 +31,7 @@ module Bannote
             begin
               room = ::Room.new(
                 department_code: request.department_code.present? ? request.department_code.to_s : nil,
+                department_name: request.department_name.present? ? request.department_name.to_s : nil,
                 name: request.name,
                 maximum_member: request.maximum_member,
                 status: request.status,
@@ -35,27 +45,21 @@ module Bannote
               )
 
             rescue ActiveRecord::RecordInvalid => e
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-                e.record.errors.full_messages.join(", ")
-              )
+              raise_invalid(e.record.errors.full_messages.join(", "))
             rescue => e
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::INTERNAL,
-                "Failed to create room: #{e.message}"
-              )
+              raise_internal("Failed to create room: #{e.message}")
             end
           end
 
           # =========================================
-          # 2. 단일 방 조회
+          # 2. 방 단일 조회
           # =========================================
           def get_room(request, _call)
             authorize!("student")
 
             room = ::Room.find_by(id: request.id)
-            raise_not_found if room.nil?
-            raise_not_found if room.deleted_at.present?
+            raise_not_found("Room") unless room
+            raise_not_found("Room") if room.deleted_at.present?
 
             Bannote::Studyroomservice::Room::V1::GetRoomResponse.new(
               room: room_to_proto(room)
@@ -63,7 +67,7 @@ module Bannote
           end
 
           # =========================================
-          # 3. 전체 방 목록
+          # 3. 방 목록 조회
           # =========================================
           def list_rooms(_request, _call)
             authorize!("student")
@@ -82,14 +86,13 @@ module Bannote
             authorize!("assistant")
 
             room = ::Room.find_by(id: request.id)
-            raise_not_found if room.nil?
-            raise_not_found if room.deleted_at.present?
+            raise_not_found("Room") unless room
+            raise_not_found("Room") if room.deleted_at.present?
 
             begin
               room.update!(
-                department_code: request.department_code.present? ?
-                                  request.department_code.to_s :
-                                  room.department_code,
+                department_code: request.department_code.presence || room.department_code,
+                department_name: request.department_name.presence || room.department_name,
                 name: request.name || room.name,
                 maximum_member: request.maximum_member || room.maximum_member,
                 status: request.status
@@ -100,10 +103,7 @@ module Bannote
               )
 
             rescue ActiveRecord::RecordInvalid => e
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-                e.record.errors.full_messages.join(", ")
-              )
+              raise_invalid(e.record.errors.full_messages.join(", "))
             end
           end
 
@@ -114,8 +114,8 @@ module Bannote
             authorize!("assistant")
 
             room = ::Room.find_by(id: request.id)
-            raise_not_found if room.nil?
-            raise_not_found if room.deleted_at.present?
+            raise_not_found("Room") unless room
+            raise_not_found("Room") if room.deleted_at.present?
 
             room.update!(deleted_at: Time.now)
 
@@ -127,23 +127,41 @@ module Bannote
           # =========================================
           private
 
-          # 권한 검증 단축 메서드
-          def authorize!(min_role)
-            unless SimulatedUserRoles.has_authority?(
-              Current.user_code,
-              SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
-            )
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Requires #{min_role.capitalize} authority or higher."
-              )
+          # ---- role 기반 authorize ----
+          def authorize!(required_role)
+            user_role = Current.user_role.to_s
+
+            unless ROLE_PRIORITY[user_role] &&
+                   ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]
+              raise_permission("Requires #{required_role.capitalize} authority or higher.")
             end
           end
 
-          def raise_not_found
+          def raise_not_found(name)
             raise GRPC::BadStatus.new(
               GRPC::Core::StatusCodes::NOT_FOUND,
-              "Room not found"
+              "#{name} not found"
+            )
+          end
+
+          def raise_invalid(message)
+            raise GRPC::BadStatus.new(
+              GRPC::Core::StatusCodes::INVALID_ARGUMENT,
+              message
+            )
+          end
+
+          def raise_permission(message)
+            raise GRPC::BadStatus.new(
+              GRPC::Core::StatusCodes::PERMISSION_DENIED,
+              message
+            )
+          end
+
+          def raise_internal(message)
+            raise GRPC::BadStatus.new(
+              GRPC::Core::StatusCodes::INTERNAL,
+              message
             )
           end
 

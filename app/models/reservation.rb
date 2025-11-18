@@ -18,6 +18,7 @@ class Reservation < ApplicationRecord
   validates :priority, presence: true
   validates :start_time, presence: true
   validates :end_time, presence: true
+
   validate  :start_time_before_end_time
 
   # ========================================
@@ -29,7 +30,10 @@ class Reservation < ApplicationRecord
   # Soft delete method
   # ========================================
   def soft_delete(deleted_by: nil)
-    update(deleted_at: Time.current)
+    update(
+      deleted_at: Time.current,
+      deleted_by: deleted_by
+    )
   end
 
   def self.with_deleted
@@ -49,7 +53,8 @@ class Reservation < ApplicationRecord
   # Auto-generate code BEFORE validation
   # ========================================
   def generate_code
-    self.code ||= SecureRandom.uuid[0..7]
+    # UUID 앞 12자리 사용 (충돌 위험 감소)
+    self.code ||= SecureRandom.uuid.delete('-')[0..11]
   end
 
   # ========================================

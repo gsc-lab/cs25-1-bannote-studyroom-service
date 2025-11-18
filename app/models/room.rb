@@ -1,9 +1,10 @@
 class Room < ApplicationRecord
   # --------------------------------------
-  # 연관 관계
+  # 연관 관계 (department_id 제거)
   # --------------------------------------
-  belongs_to :department, optional: true   # 기존 데이터와의 호환 위해 optional
-                                           # 나중에 전부 채워지면 optional: false 로 변경 가능
+  # belongs_to :department  ← 삭제해야 함 (이제 department 테이블이 없기 때문)
+  # 현재 구조에서는 department_id 컬럼 자체가 없으므로 belongs_to 제거
+  # 필요하면 department_code 로 UserService 연동만 사용
 
   has_many :room_operating_hours, dependent: :destroy
   has_many :room_exceptions, dependent: :destroy
@@ -19,25 +20,23 @@ class Room < ApplicationRecord
             numericality: { only_integer: true, greater_than_or_equal_to: 1 }
 
   # --------------------------------------
-  # 이름 중복 검증
-  # 1) department_id가 있는 경우 → 같은 학과 내에서 이름 중복 금지
-  # 2) department_id가 없는 경우(nil) → 공용 방, 전체에서 이름 중복 금지
+  # 이름 중복 검증 (department_code 기반)
   # --------------------------------------
-  validate :unique_name_within_department
+  validate :unique_name_within_department_code
 
-  def unique_name_within_department
-    if department_id.present?
-      # 같은 학과 내 동일 이름 금지
-      if Room.where(department_id: department_id, name: name)
-              .where.not(id: id)
-              .exists?
+  def unique_name_within_department_code
+    if department_code.present?
+      # 같은 학과(department_code) 내 동일 이름 금지
+      if Room.where(department_code: department_code, name: name)
+             .where.not(id: id)
+             .exists?
         errors.add(:name, "해당 학과에 동일한 이름의 방이 이미 존재합니다.")
       end
     else
       # 공용방(nil) → 전체에서 중복 금지
-      if Room.where(department_id: nil, name: name)
-              .where.not(id: id)
-              .exists?
+      if Room.where(department_code: nil, name: name)
+             .where.not(id: id)
+             .exists?
         errors.add(:name, "공용 방 이름은 전체에서 중복될 수 없습니다.")
       end
     end

@@ -1,5 +1,4 @@
 class RoomOperatingHour < ApplicationRecord
-  # Room 모델과 다대일 관계
   belongs_to :room
 
   # 기본 유효성 검사
@@ -8,11 +7,10 @@ class RoomOperatingHour < ApplicationRecord
   validates :opening_time, presence: true
   validates :closing_time, presence: true
 
-  # 추가 유효성 검사 (예외 처리)
   validate :validate_time_order
   validate :validate_day_of_week_duplication
 
-  # 소프트 삭제
+  # Soft Delete
   default_scope { where(deleted_at: nil) }
 
   def soft_delete
@@ -26,26 +24,31 @@ class RoomOperatingHour < ApplicationRecord
   private
 
   # ----------------------------------------
-  # 1. opening_time < closing_time 검증
+  # opening_time < closing_time 검증
   # ----------------------------------------
   def validate_time_order
     return if opening_time.blank? || closing_time.blank?
 
-    if opening_time >= closing_time
+    ot = Time.parse(opening_time)
+    ct = Time.parse(closing_time)
+
+    if ot >= ct
       errors.add(:opening_time, "must be earlier than closing_time")
     end
+  rescue ArgumentError
+    errors.add(:opening_time, "invalid time format (expected HH:MM)")
   end
 
   # ----------------------------------------
-  # 2. 동일 room_id + day_of_week 중복 금지
+  # 동일 room_id + day_of_week 중복 금지
   # ----------------------------------------
   def validate_day_of_week_duplication
     return if room_id.blank? || day_of_week.blank?
 
-    duplicate = RoomOperatingHour.with_deleted
-                                 .where(room_id: room_id, day_of_week: day_of_week, deleted_at: nil)
-                                 .where.not(id: id)
-                                 .exists?
+    duplicate = RoomOperatingHour
+                  .where(room_id: room_id, day_of_week: day_of_week, deleted_at: nil)
+                  .where.not(id: id)
+                  .exists?
 
     if duplicate
       errors.add(:day_of_week, "already exists for this room")

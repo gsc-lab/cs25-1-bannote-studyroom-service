@@ -5,14 +5,23 @@ require 'reservation/service_pb'
 require 'reservation/service_services_pb'
 
 require_relative '../../app/models/concerns/current'
-require_relative '../../app/models/concerns/simulated_user_roles'
 
 module Bannote
   module Studyroomservice
     module Reservation
       module V1
         class ReservationServiceHandler < Bannote::Studyroomservice::Reservation::V1::ReservationService::Service
-          
+
+          # -------------------------------------------------------
+          # ROLE PRIORITY TABLE
+          # -------------------------------------------------------
+          ROLE_PRIORITY = {
+            "student"   => 1,
+            "assistant" => 2,
+            "professor" => 3,
+            "admin"     => 4
+          }.freeze
+
           # =========================================
           # 1. 예약 생성
           # =========================================
@@ -21,9 +30,6 @@ module Bannote
 
             authorize!("student")
 
-            # -------------------------------
-            # 1) 시간 파싱 + 기본 검증
-            # -------------------------------
             start_time = request.start_time&.seconds ? Time.at(request.start_time.seconds) : nil
             end_time   = request.end_time&.seconds ? Time.at(request.end_time.seconds) : nil
 
@@ -31,23 +37,14 @@ module Bannote
             raise_invalid("end_time is required") unless end_time
             raise_invalid("start_time must be earlier than end_time") if start_time >= end_time
 
-            # -------------------------------
-            # 2) Room 존재 여부 + 삭제 여부
-            # -------------------------------
             room = ::Room.find_by(id: request.room_id)
             raise_not_found("Room") unless room
             raise_precondition("Cannot reserve a deleted room") if room.deleted_at.present?
 
-            # -------------------------------
-            # 3) department_code 매칭 검증
-            # -------------------------------
             if room.department_code.present? && room.department_code != Current.department_code
               raise_permission("Cannot reserve a room belonging to another department")
             end
 
-            # -------------------------------
-            # 4) 운영시간 체크
-            # -------------------------------
             op = ::RoomOperatingHour.where(room_id: room.id, day_of_week: start_time.wday, deleted_at: nil).first
             raise_precondition("No operating hour defined for this day") unless op
 
@@ -58,41 +55,28 @@ module Bannote
               raise_precondition("Reservation time is outside operating hours")
             end
 
-            # -------------------------------
-            # 5) 휴일(RoomException) 체크
-            # -------------------------------
             exception = ::RoomException.where(room_id: room.id, holiday_date: start_time.to_date, deleted_at: nil).first
-
             if exception
-              # 완전 휴일
               if exception.opening_time.nil? && exception.closing_time.nil?
                 raise_precondition("Reservation not allowed: Entire day is marked as holiday")
               end
 
-              # 부분 휴일
               if exception.opening_time.present? && exception.closing_time.present?
                 ex_start = Time.parse(exception.opening_time.strftime("%H:%M"))
                 ex_end   = Time.parse(exception.closing_time.strftime("%H:%M"))
 
-                # 예외 구간과 겹치면 예약 불가
                 if (start_time < ex_end) && (end_time > ex_start)
                   raise_precondition("Reservation time conflicts with room exception period")
                 end
               end
             end
 
-            # -------------------------------
-            # 6) 기존 예약과 시간 중복 체크
-            # -------------------------------
             overlap = ::Reservation.where(room_id: room.id, deleted_at: nil)
                                    .where("start_time < ? AND end_time > ?", end_time, start_time)
                                    .exists?
 
             raise_precondition("Reservation time overlaps with an existing reservation") if overlap
 
-            # -------------------------------
-            # 최종 저장
-            # -------------------------------
             reservation = ::Reservation.new(
               room_id: request.room_id,
               group_id: request.group_id,
@@ -100,7 +84,8 @@ module Bannote
               start_time: start_time,
               end_time: end_time,
               purpose: request.purpose,
-              priority: request.priority
+              priority: request.priority,
+              created_by: Current.user_code # ← user_code는 여기서만 사용됨
             )
 
             reservation.save!
@@ -154,20 +139,17 @@ module Bannote
 
             reservation = ::Reservation.find_by!(code: request.code)
             raise_not_found("Reservation") if reservation.deleted_at.present?
-            raise_permission("role #{Current.user_role} cannot modify this reservation") unless can_modify?(Current.user_role)
+            raise_permission("Role #{Current.user_role} cannot modify this reservation") unless can_modify?(Current.user_role)
 
-            # 시간 파싱 + 역전 체크
             start_time = request.start_time ? Time.at(request.start_time.seconds) : reservation.start_time
             end_time   = request.end_time   ? Time.at(request.end_time.seconds)   : reservation.end_time
 
             raise_invalid("start_time must be earlier than end_time") if start_time >= end_time
 
-            # Room 변경 시 재검증
             room = ::Room.find_by(id: request.room_id || reservation.room_id)
             raise_not_found("Room") unless room
             raise_precondition("Cannot reserve a deleted room") if room.deleted_at.present?
 
-            # 중복 체크 (자기 제외)
             overlap = ::Reservation.where(room_id: room.id, deleted_at: nil)
                                    .where("start_time < ? AND end_time > ?", end_time, start_time)
                                    .where.not(id: reservation.id)
@@ -202,7 +184,7 @@ module Bannote
 
             reservation = ::Reservation.find_by!(code: request.code)
             raise_not_found("Reservation") if reservation.deleted_at.present?
-            raise_permission("role #{Current.user_role} cannot delete this reservation") unless can_modify?(Current.user_role)
+            raise_permission("Role #{Current.user_role} cannot delete this reservation") unless can_modify?(Current.user_role)
 
             reservation.update!(deleted_at: Time.now)
 
@@ -216,17 +198,18 @@ module Bannote
           # =========================================
           private
 
-          def authorize!(min_role)
-            unless SimulatedUserRoles.has_authority?(
-              Current.user_code,
-              SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
-            )
-              raise_permission("Requires #{min_role.capitalize} authority or higher.")
+          # ---- role 기반 authorize 로직으로 변경됨 ----
+          def authorize!(required_role)
+            user_role = Current.user_role.to_s
+
+            unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]
+              raise_permission("Requires #{required_role.capitalize} authority or higher.")
             end
           end
 
+          # 수정/삭제 가능한 Role
           def can_modify?(role)
-            %w[assistant professor admin].any? { |r| role.to_s.include?(r) }
+            ROLE_PRIORITY[role.to_s].to_i >= ROLE_PRIORITY["assistant"]
           end
 
           def raise_not_found(name)
