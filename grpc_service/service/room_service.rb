@@ -67,15 +67,30 @@ module Bannote
           end
 
           # =========================================
-          # 3. 방 목록 조회
+          # 3. 방 목록 조회 (페이지네이션)
           # =========================================
-          def list_rooms(_request, _call)
-            authorize!("student")
+          def list_rooms(request, _call)
+            authorize!("assistant")
 
-            rooms = ::Room.where(deleted_at: nil)
+            page      = request.page.to_i <= 0 ? 1 : request.page.to_i
+            page_size = request.page_size.to_i <= 0 ? 20 : request.page_size.to_i
+            offset    = (page - 1) * page_size
+
+            total_count = ::Room.where(deleted_at: nil).count
+
+            rooms = ::Room
+                      .where(deleted_at: nil)
+                      .order(created_at: :desc)
+                      .offset(offset)
+                      .limit(page_size)
+
+            room_responses = rooms.map { |room| room_to_proto(room) }
 
             Bannote::Studyroomservice::Room::V1::ListRoomsResponse.new(
-              rooms: rooms.map { |room| room_to_proto(room) }
+              rooms: room_responses,
+              total_count: total_count,
+              page: page,
+              page_size: page_size
             )
           end
 
@@ -127,7 +142,6 @@ module Bannote
           # =========================================
           private
 
-          # ---- role 기반 authorize ----
           def authorize!(required_role)
             user_role = Current.user_role.to_s
 
@@ -165,7 +179,7 @@ module Bannote
             )
           end
 
-          # Room → Proto 변환
+          # Room → Proto 변환 (timestamp 포함)
           def room_to_proto(room)
             Bannote::Studyroomservice::Room::V1::Room.new(
               id: room.id,
@@ -174,11 +188,12 @@ module Bannote
               name: room.name,
               maximum_member: room.maximum_member,
               status: room.status,
-              created_at: Google::Protobuf::Timestamp.new(seconds: room.created_at.to_i),
-              updated_at: Google::Protobuf::Timestamp.new(seconds: room.updated_at.to_i),
+              created_at: Google::Protobuf::Timestamp.new(seconds: room.created_at.to_i, nanos: room.created_at.nsec),
+              updated_at: Google::Protobuf::Timestamp.new(seconds: room.updated_at.to_i, nanos: room.updated_at.nsec),
               created_by: room.created_by
             )
           end
+
         end
       end
     end

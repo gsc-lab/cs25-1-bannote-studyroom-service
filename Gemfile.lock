@@ -85,6 +85,8 @@ GEM
     debug (1.11.0)
       irb (~> 1.10)
       reline (>= 0.3.8)
+    digest-crc (0.7.0)
+      rake (>= 12.0.0, < 14.0.0)
     dotenv (3.1.8)
     dotenv-rails (3.1.8)
       dotenv (= 3.1.8)
@@ -195,6 +197,8 @@ GEM
       tsort
     reline (0.6.2)
       io-console (~> 0.5)
+    ruby-kafka (1.5.0)
+      digest-crc
     securerandom (0.4.1)
     stringio (3.1.7)
     thor (1.4.0)
@@ -226,6 +230,7 @@ DEPENDENCIES
   mysql2 (~> 0.5)
   puma (~> 6.4)
   rails (~> 8.0.3)
+  ruby-kafka
   tzinfo-data
 
 BUNDLED WITH
