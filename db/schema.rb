@@ -10,7 +10,15 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_19_092833) do
+  create_table "departments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_departments_on_code", unique: true
+  end
+
   create_table "reservations", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "room_id", null: false
     t.datetime "start_time"
@@ -24,6 +32,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
     t.datetime "deleted_at"
     t.bigint "user_id"
     t.string "code", null: false
+    t.string "created_by"
+    t.string "deleted_by"
     t.index ["code"], name: "index_reservations_on_code", unique: true
     t.index ["group_id"], name: "index_reservations_on_group_id"
     t.index ["link_id"], name: "index_reservations_on_link_id"
@@ -34,8 +44,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
     t.bigint "room_id", null: false
     t.date "holiday_date", null: false
     t.string "reason", limit: 100
-    t.time "opening_time"
-    t.time "closing_time"
+    t.string "opening_time"
+    t.string "closing_time"
     t.bigint "created_by", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -47,9 +57,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
   create_table "room_operating_hours", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "room_id", null: false
     t.integer "day_of_week", limit: 1, null: false
-    t.time "opening_time", null: false
-    t.time "closing_time", null: false
-    t.time "day_maximum_time"
+    t.string "opening_time", null: false
+    t.string "closing_time", null: false
+    t.string "day_maximum_time"
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -68,8 +78,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_26_151640) do
     t.integer "status"
     t.integer "capacity"
     t.bigint "created_by"
-    t.string "department_name"
     t.string "department_code"
+    t.string "department_name"
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_rooms_on_deleted_at"
   end
 
   add_foreign_key "reservations", "rooms"

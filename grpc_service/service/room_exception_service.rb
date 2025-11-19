@@ -5,7 +5,6 @@ require 'room_exception/service_pb'
 require 'room_exception/service_services_pb'
 
 require_relative '../../app/models/concerns/current'
-require_relative '../../app/models/concerns/simulated_user_roles'
 
 module Bannote
   module Studyroomservice
@@ -13,73 +12,53 @@ module Bannote
       module V1
         class RoomExceptionServiceHandler < Bannote::Studyroomservice::Roomexception::V1::RoomExceptionService::Service
 
+          ROLE_PRIORITY = {
+            "student"   => 1,
+            "assistant" => 2,
+            "professor" => 3,
+            "admin"     => 4
+          }.freeze
+
           # =========================================
-          # 1. 방 예외 생성
+          # 1) CREATE
           # =========================================
           def create_room_exception(request, _call)
             authorize!("assistant")
 
-            # 1) room 존재 여부 + 삭제 여부
             room = ::Room.find_by(id: request.room_id)
             raise_not_found("Room") unless room
-            raise_precondition("Cannot add exception to deleted room") if room.deleted_at.present?
+            raise_precondition("Cannot add exception to a deleted room") if room.deleted_at.present?
 
-            # 2) holiday_date 형식 검증
-            if request.holiday_date.present?
-              begin
-                Date.parse(request.holiday_date)
-              rescue ArgumentError
-                raise_invalid("Invalid date format for holiday_date. Expected YYYY-MM-DD.")
-              end
-            end
+            # 날짜 검증
+            validate_holiday_date!(request.holiday_date)
 
-            # 3) 시간 검증(opening_time < closing_time)
-            if request.opening_time.present? && request.closing_time.present?
-              begin
-                start_time = Time.parse(request.opening_time)
-                end_time = Time.parse(request.closing_time)
-              rescue ArgumentError
-                raise_invalid("Invalid time format. Expected HH:MM.")
-              end
-              raise_invalid("Opening time must be before closing time") if start_time >= end_time
-            end
+            # 시간 검증 (초기값 "" → nil 자동 변환)
+            opening  = request.opening_time.presence
+            closing  = request.closing_time.presence
 
-            # 4) 기존 예외와 시간대 중복 금지
-            if request.holiday_date.present?
-              duplicate = ::RoomException.where(
-                room_id: request.room_id,
-                holiday_date: request.holiday_date,
-                deleted_at: nil
-              ).exists?
+            validate_exception_time_format!(opening, closing)
 
-              raise_already_exists("Holiday exception already exists for this date.") if duplicate
-            end
+            # 중복 검증
+            validate_duplicate_exception!(request.room_id, request.holiday_date)
 
-            # 5) 운영시간과 겹치지 않는 예외 금지
-            if request.opening_time.present? && request.closing_time.present?
-              unless exception_overlaps_operating_hours?(room, start_time, end_time, request.holiday_date)
-                raise_invalid("Exception time does not overlap with operating hours.")
-              end
-            end
-
-            new_exception = ::RoomException.create!(
-              room_id: request.room_id,
+            exception = ::RoomException.create!(
+              room_id:      request.room_id,
               holiday_date: request.holiday_date,
-              reason: request.reason,
-              opening_time: request.opening_time,
-              closing_time: request.closing_time,
-              created_by: Current.user_code
+              reason:       request.reason,
+              opening_time: opening,   # string or nil
+              closing_time: closing,   # string or nil
+              created_by:   Current.user_code
             )
 
             Bannote::Studyroomservice::Roomexception::V1::CreateRoomExceptionResponse.new(
-              room_exception: room_exception_to_proto(new_exception)
+              room_exception: room_exception_to_proto(exception)
             )
           rescue ActiveRecord::RecordInvalid => e
             raise_invalid(e.message)
           end
 
           # =========================================
-          # 2. 단일 예외 조회
+          # 2) GET
           # =========================================
           def get_room_exception(request, _call)
             authorize!("student")
@@ -94,7 +73,7 @@ module Bannote
           end
 
           # =========================================
-          # 3. 예외 목록 조회
+          # 3) LIST
           # =========================================
           def list_room_exceptions(request, _call)
             authorize!("student")
@@ -108,7 +87,7 @@ module Bannote
           end
 
           # =========================================
-          # 4. 예외 수정
+          # 4) UPDATE
           # =========================================
           def update_room_exception(request, _call)
             authorize!("assistant")
@@ -117,48 +96,29 @@ module Bannote
             raise_not_found("Room exception") unless exception
             raise_precondition("Cannot update deleted exception") if exception.deleted_at.present?
 
-            # 방 삭제 예외 수정 금지
             room = ::Room.find_by(id: exception.room_id)
             raise_not_found("Room") unless room
             raise_precondition("Cannot modify exception of deleted room") if room.deleted_at.present?
 
-            # 날짜 형식 검증
+            # 날짜 수정 검증
             if request.holiday_date.present?
-              begin
-                Date.parse(request.holiday_date)
-              rescue ArgumentError
-                raise_invalid("Invalid date format for holiday_date. Expected YYYY-MM-DD.")
-              end
+              validate_holiday_date!(request.holiday_date)
+              validate_duplicate_exception_on_update!(exception, request.holiday_date)
             end
 
-            # 시간 역전 검증
-            if request.opening_time.present? && request.closing_time.present?
-              begin
-                start_time = Time.parse(request.opening_time)
-                end_time = Time.parse(request.closing_time)
-              rescue ArgumentError
-                raise_invalid("Invalid time format. Expected HH:MM.")
-              end
-              raise_invalid("Opening time must be before closing time") if start_time >= end_time
-            end
+            # 시간 수정 검증
+            opening = request.opening_time.presence
+            closing = request.closing_time.presence
 
-            # 예외 중복(날짜 중복) 검증
-            if request.holiday_date.present?
-              duplicate = ::RoomException.where(
-                room_id: exception.room_id,
-                holiday_date: request.holiday_date,
-                deleted_at: nil
-              ).where.not(id: exception.id).exists?
-
-              raise_already_exists("An exception already exists for this date.") if duplicate
+            if request.opening_time.present? || request.closing_time.present?
+              validate_exception_time_format!(opening, closing)
             end
 
             exception.update!(
-              room_id: request.room_id,
-              holiday_date: request.holiday_date,
-              reason: request.reason,
-              opening_time: request.opening_time,
-              closing_time: request.closing_time
+              holiday_date: request.holiday_date.presence || exception.holiday_date,
+              reason:       request.reason.presence       || exception.reason,
+              opening_time: opening.nil? ? exception.opening_time : opening,
+              closing_time: closing.nil? ? exception.closing_time : closing
             )
 
             Bannote::Studyroomservice::Roomexception::V1::UpdateRoomExceptionResponse.new(
@@ -169,7 +129,7 @@ module Bannote
           end
 
           # =========================================
-          # 5. 예외 삭제
+          # 5) DELETE
           # =========================================
           def delete_room_exception(request, _call)
             authorize!("admin")
@@ -187,75 +147,88 @@ module Bannote
           end
 
           # =========================================
-          # 공통 Util 메서드
+          # 🔥 유틸
           # =========================================
           private
 
-          def authorize!(min_role)
-            unless SimulatedUserRoles.has_authority?(
-              Current.user_code,
-              SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
-            )
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Requires #{min_role.capitalize} authority or higher."
-              )
+          # "YYYY-MM-DD" 검증
+          def validate_holiday_date!(date)
+            raise_invalid("holiday_date is required") unless date.present?
+            Date.parse(date)
+          rescue
+            raise_invalid("Invalid date format for holiday_date. Expected YYYY-MM-DD.")
+          end
+
+          # ✔ 핵심: "" → nil 처리 + 종일 휴무 처리 포함
+          def validate_exception_time_format!(opening, closing)
+            opening = opening.presence
+            closing = closing.presence
+
+            # 둘 다 nil이면: 종일 휴무 → 통과
+            return if opening.nil? && closing.nil?
+
+            # 둘 중 하나만 nil이면 잘못됨
+            if opening.nil? && closing.present?
+              raise_invalid("opening_time is required when closing_time is provided")
             end
-          end
-
-          def raise_not_found(name)
-            raise GRPC::BadStatus.new(
-              GRPC::Core::StatusCodes::NOT_FOUND,
-              "#{name} not found"
-            )
-          end
-
-          def raise_invalid(message)
-            raise GRPC::BadStatus.new(
-              GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-              message
-            )
-          end
-
-          def raise_precondition(message)
-            raise GRPC::BadStatus.new(
-              GRPC::Core::StatusCodes::FAILED_PRECONDITION,
-              message
-            )
-          end
-
-          def raise_already_exists(message)
-            raise GRPC::BadStatus.new(
-              GRPC::Core::StatusCodes::ALREADY_EXISTS,
-              message
-            )
-          end
-
-          # 운영시간과 예외 시간이 겹치는지 확인
-          def exception_overlaps_operating_hours?(room, start_time, end_time, date)
-            ops = RoomOperatingHour.where(room_id: room.id)
-            return false if ops.empty?
-
-            ops.any? do |op|
-              op_start = Time.parse(op.opening_time.strftime("%H:%M"))
-              op_end = Time.parse(op.closing_time.strftime("%H:%M"))
-              (start_time < op_end) && (end_time > op_start)
+            if closing.nil? && opening.present?
+              raise_invalid("closing_time is required when opening_time is provided")
             end
+
+            # 시간 형식 검증
+            begin
+              start_t = Time.parse(opening)
+              end_t   = Time.parse(closing)
+            rescue
+              raise_invalid("Invalid time format. Expected HH:MM.")
+            end
+
+            raise_invalid("opening_time must be before closing_time") if start_t >= end_t
           end
 
+          # 중복 체크
+          def validate_duplicate_exception!(room_id, date)
+            exists = ::RoomException.where(room_id: room_id, holiday_date: date, deleted_at: nil).exists?
+            raise_already_exists("Holiday exception already exists for this date.") if exists
+          end
+
+          def validate_duplicate_exception_on_update!(exception, date)
+            exists = ::RoomException.where(room_id: exception.room_id,
+                                           holiday_date: date,
+                                           deleted_at: nil)
+                                    .where.not(id: exception.id)
+                                    .exists?
+            raise_already_exists("An exception already exists for this date.") if exists
+          end
+
+          # proto 변환
           def room_exception_to_proto(exception)
             Bannote::Studyroomservice::Roomexception::V1::RoomException.new(
               id: exception.id,
               room_id: exception.room_id,
               holiday_date: exception.holiday_date.to_s,
               reason: exception.reason,
-              opening_time: exception.opening_time ? exception.opening_time.strftime('%H:%M') : nil,
-              closing_time: exception.closing_time ? exception.closing_time.strftime('%H:%M') : nil,
+              opening_time: exception.opening_time,
+              closing_time: exception.closing_time,
               created_by: exception.created_by,
               created_at: Google::Protobuf::Timestamp.new(seconds: exception.created_at.to_i),
               updated_at: Google::Protobuf::Timestamp.new(seconds: exception.updated_at.to_i)
             )
           end
+
+          # 에러 및 권한
+          def raise_not_found(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, msg); end
+          def raise_invalid(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, msg); end
+          def raise_precondition(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::FAILED_PRECONDITION, msg); end
+          def raise_already_exists(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::ALREADY_EXISTS, msg); end
+
+          def authorize!(required_role)
+            user_role = Current.user_role.to_s
+            unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]
+              raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, "Permission denied")
+            end
+          end
+
         end
       end
     end

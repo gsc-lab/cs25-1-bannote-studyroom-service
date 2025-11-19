@@ -1,5 +1,4 @@
-# frozen_string_literal: true 
-# 유저 서비스 측으로 MetaData 수정 완료
+# frozen_string_literal: true
 
 module Current
   thread_mattr_accessor :user_code
@@ -7,6 +6,6 @@ module Current
 
   def self.reset
     self.user_code = nil
-    self.user_role = nil
+    self.user_role = "student" # 기본 권한
   end
 end

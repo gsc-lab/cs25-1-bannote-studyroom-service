@@ -3,10 +3,10 @@ services:
     build: .
     container_name: studyroom_app
     command: bash -c "rm -f tmp/pids/server.pid && ruby grpc_service/server.rb"
-    working_dir: /studyroom_service
+    working_dir: /rails
     volumes:
-      - .:/studyroom_service
-      - /studyroom_service/tmp
+      - .:/rails
+
     ports:
       - "9090:9090"
     depends_on:

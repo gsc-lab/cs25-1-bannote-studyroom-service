@@ -12,9 +12,6 @@ class AuthInterceptor < GRPC::ServerInterceptor
     "Unauthenticated: x-user-code metadata is missing"
   )
 
-  # ------------------------------------------------------------
-  # gRPC 요청 처리 (interceptor entry point)
-  # ------------------------------------------------------------
   def request_response(request:, call:, method:)
     # ============================================================
     # 1. HealthCheck 계열 요청은 인증 예외 처리
@@ -25,10 +22,10 @@ class AuthInterceptor < GRPC::ServerInterceptor
     end
 
     # ============================================================
-    # 2. 일반 요청은 메타데이터 기반 인증 수행
+    # 2. 인증 수행
     # ============================================================
     user_code = call.metadata['x-user-code']
-    user_role = call.metadata['x-user-role']
+    user_role = call.metadata['x-user-role'] || "student"  # 기본 student
 
     if user_code.nil? || user_code.empty?
       raise UNAUTHENTICATED
@@ -40,8 +37,9 @@ class AuthInterceptor < GRPC::ServerInterceptor
 
     puts "[AuthInterceptor] user_code=#{user_code}, user_role=#{user_role}"
 
-    # 실제 gRPC 서비스 로직 실행
+    # 실제 서비스 로직 실행
     yield
+
   ensure
     # ============================================================
     # 3. 요청 완료 후 Context 정리
