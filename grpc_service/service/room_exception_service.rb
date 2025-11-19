@@ -32,25 +32,27 @@ module Bannote
             # 날짜 검증
             validate_holiday_date!(request.holiday_date)
 
-            # 시간 검증 (둘 다 nil 가능 = 종일 휴무)
-            validate_exception_time_format!(request.opening_time, request.closing_time)
+            # 시간 검증 (초기값 "" → nil 자동 변환)
+            opening  = request.opening_time.presence
+            closing  = request.closing_time.presence
 
-            # 중복 날짜 예외 금지
+            validate_exception_time_format!(opening, closing)
+
+            # 중복 검증
             validate_duplicate_exception!(request.room_id, request.holiday_date)
 
             exception = ::RoomException.create!(
-              room_id:       request.room_id,
-              holiday_date:  request.holiday_date,
-              reason:        request.reason,
-              opening_time:  request.opening_time.presence,  # string 또는 nil
-              closing_time:  request.closing_time.presence,  # string 또는 nil
-              created_by:    Current.user_code
+              room_id:      request.room_id,
+              holiday_date: request.holiday_date,
+              reason:       request.reason,
+              opening_time: opening,   # string or nil
+              closing_time: closing,   # string or nil
+              created_by:   Current.user_code
             )
 
             Bannote::Studyroomservice::Roomexception::V1::CreateRoomExceptionResponse.new(
               room_exception: room_exception_to_proto(exception)
             )
-
           rescue ActiveRecord::RecordInvalid => e
             raise_invalid(e.message)
           end
@@ -98,25 +100,25 @@ module Bannote
             raise_not_found("Room") unless room
             raise_precondition("Cannot modify exception of deleted room") if room.deleted_at.present?
 
-            # 날짜 업데이트 시 검증
+            # 날짜 수정 검증
             if request.holiday_date.present?
               validate_holiday_date!(request.holiday_date)
               validate_duplicate_exception_on_update!(exception, request.holiday_date)
             end
 
-            # 시간 업데이트 시 검증
+            # 시간 수정 검증
+            opening = request.opening_time.presence
+            closing = request.closing_time.presence
+
             if request.opening_time.present? || request.closing_time.present?
-              validate_exception_time_format!(
-                request.opening_time.presence,
-                request.closing_time.presence
-              )
+              validate_exception_time_format!(opening, closing)
             end
 
             exception.update!(
               holiday_date: request.holiday_date.presence || exception.holiday_date,
               reason:       request.reason.presence       || exception.reason,
-              opening_time: request.opening_time.presence || exception.opening_time,
-              closing_time: request.closing_time.presence || exception.closing_time
+              opening_time: opening.nil? ? exception.opening_time : opening,
+              closing_time: closing.nil? ? exception.closing_time : closing
             )
 
             Bannote::Studyroomservice::Roomexception::V1::UpdateRoomExceptionResponse.new(
@@ -145,11 +147,11 @@ module Bannote
           end
 
           # =========================================
-          # 유틸 함수
+          # 🔥 유틸
           # =========================================
           private
 
-          # 날짜 YYYY-MM-DD 검증
+          # "YYYY-MM-DD" 검증
           def validate_holiday_date!(date)
             raise_invalid("holiday_date is required") unless date.present?
             Date.parse(date)
@@ -157,20 +159,23 @@ module Bannote
             raise_invalid("Invalid date format for holiday_date. Expected YYYY-MM-DD.")
           end
 
-          # 예외 시간 검증 로직 (핵심)
+          # ✔ 핵심: "" → nil 처리 + 종일 휴무 처리 포함
           def validate_exception_time_format!(opening, closing)
-            # 둘 다 nil → 종일 휴무
+            opening = opening.presence
+            closing = closing.presence
+
+            # 둘 다 nil이면: 종일 휴무 → 통과
             return if opening.nil? && closing.nil?
 
-            # 둘 중 하나만 존재하면 invalid
-            if opening.present? && closing.blank?
-              raise_invalid("closing_time is required when opening_time is provided")
-            end
-            if closing.present? && opening.blank?
+            # 둘 중 하나만 nil이면 잘못됨
+            if opening.nil? && closing.present?
               raise_invalid("opening_time is required when closing_time is provided")
             end
+            if closing.nil? && opening.present?
+              raise_invalid("closing_time is required when opening_time is provided")
+            end
 
-            # HH:MM 검증
+            # 시간 형식 검증
             begin
               start_t = Time.parse(opening)
               end_t   = Time.parse(closing)
@@ -181,7 +186,7 @@ module Bannote
             raise_invalid("opening_time must be before closing_time") if start_t >= end_t
           end
 
-          # 중복 날짜 예외 금지
+          # 중복 체크
           def validate_duplicate_exception!(room_id, date)
             exists = ::RoomException.where(room_id: room_id, holiday_date: date, deleted_at: nil).exists?
             raise_already_exists("Holiday exception already exists for this date.") if exists
@@ -211,7 +216,7 @@ module Bannote
             )
           end
 
-          # 공통 에러/권한
+          # 에러 및 권한
           def raise_not_found(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, msg); end
           def raise_invalid(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, msg); end
           def raise_precondition(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::FAILED_PRECONDITION, msg); end

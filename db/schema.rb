@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_11_19_091834) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_19_092833) do
   create_table "departments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "name", null: false
     t.string "code", null: false
@@ -33,6 +33,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_19_091834) do
     t.bigint "user_id"
     t.string "code", null: false
     t.string "created_by"
+    t.string "deleted_by"
     t.index ["code"], name: "index_reservations_on_code", unique: true
     t.index ["group_id"], name: "index_reservations_on_group_id"
     t.index ["link_id"], name: "index_reservations_on_link_id"
