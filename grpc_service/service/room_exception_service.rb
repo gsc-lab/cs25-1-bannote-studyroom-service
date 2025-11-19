@@ -20,46 +20,43 @@ module Bannote
           }.freeze
 
           # =========================================
-          # 1. 예외 생성
+          # 1) CREATE
           # =========================================
           def create_room_exception(request, _call)
             authorize!("assistant")
 
             room = ::Room.find_by(id: request.room_id)
             raise_not_found("Room") unless room
-            raise_precondition("Cannot add exception to deleted room") if room.deleted_at.present?
+            raise_precondition("Cannot add exception to a deleted room") if room.deleted_at.present?
 
+            # 날짜 검증
             validate_holiday_date!(request.holiday_date)
-            validate_times!(request.opening_time, request.closing_time)
+
+            # 시간 검증 (둘 다 nil 가능 = 종일 휴무)
+            validate_exception_time_format!(request.opening_time, request.closing_time)
+
+            # 중복 날짜 예외 금지
             validate_duplicate_exception!(request.room_id, request.holiday_date)
 
-            start_time = request.opening_time
-            end_time   = request.closing_time
-
-            if request.opening_time.present? && request.closing_time.present?
-              unless exception_overlaps_operating_hours?(room, request.opening_time, request.closing_time)
-                raise_invalid("Exception time does not overlap with operating hours.")
-              end
-            end
-
-            new_exception = ::RoomException.create!(
-              room_id: request.room_id,
-              holiday_date: request.holiday_date,
-              reason: request.reason,
-              opening_time: request.opening_time,
-              closing_time: request.closing_time,
-              created_by: Current.user_code
+            exception = ::RoomException.create!(
+              room_id:       request.room_id,
+              holiday_date:  request.holiday_date,
+              reason:        request.reason,
+              opening_time:  request.opening_time.presence,  # string 또는 nil
+              closing_time:  request.closing_time.presence,  # string 또는 nil
+              created_by:    Current.user_code
             )
 
             Bannote::Studyroomservice::Roomexception::V1::CreateRoomExceptionResponse.new(
-              room_exception: room_exception_to_proto(new_exception)
+              room_exception: room_exception_to_proto(exception)
             )
+
           rescue ActiveRecord::RecordInvalid => e
             raise_invalid(e.message)
           end
 
           # =========================================
-          # 2. 단일 조회
+          # 2) GET
           # =========================================
           def get_room_exception(request, _call)
             authorize!("student")
@@ -74,7 +71,7 @@ module Bannote
           end
 
           # =========================================
-          # 3. 목록 조회
+          # 3) LIST
           # =========================================
           def list_room_exceptions(request, _call)
             authorize!("student")
@@ -88,7 +85,7 @@ module Bannote
           end
 
           # =========================================
-          # 4. 예외 수정
+          # 4) UPDATE
           # =========================================
           def update_room_exception(request, _call)
             authorize!("assistant")
@@ -101,18 +98,25 @@ module Bannote
             raise_not_found("Room") unless room
             raise_precondition("Cannot modify exception of deleted room") if room.deleted_at.present?
 
-            validate_holiday_date!(request.holiday_date) if request.holiday_date.present?
-            validate_times!(request.opening_time, request.closing_time) if request.opening_time.present? && request.closing_time.present?
-
+            # 날짜 업데이트 시 검증
             if request.holiday_date.present?
+              validate_holiday_date!(request.holiday_date)
               validate_duplicate_exception_on_update!(exception, request.holiday_date)
             end
 
+            # 시간 업데이트 시 검증
+            if request.opening_time.present? || request.closing_time.present?
+              validate_exception_time_format!(
+                request.opening_time.presence,
+                request.closing_time.presence
+              )
+            end
+
             exception.update!(
-              holiday_date: request.holiday_date || exception.holiday_date,
-              reason:       request.reason       || exception.reason,
-              opening_time: request.opening_time || exception.opening_time,
-              closing_time: request.closing_time || exception.closing_time
+              holiday_date: request.holiday_date.presence || exception.holiday_date,
+              reason:       request.reason.presence       || exception.reason,
+              opening_time: request.opening_time.presence || exception.opening_time,
+              closing_time: request.closing_time.presence || exception.closing_time
             )
 
             Bannote::Studyroomservice::Roomexception::V1::UpdateRoomExceptionResponse.new(
@@ -123,7 +127,7 @@ module Bannote
           end
 
           # =========================================
-          # 5. 예외 삭제
+          # 5) DELETE
           # =========================================
           def delete_room_exception(request, _call)
             authorize!("admin")
@@ -141,95 +145,85 @@ module Bannote
           end
 
           # =========================================
-          # 공통 유틸
+          # 유틸 함수
           # =========================================
           private
 
-          def authorize!(required_role)
-            user_role = Current.user_role.to_s
-            unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Requires #{required_role.capitalize} authority or higher."
-              )
-            end
-          end
-
-          # 날짜 유효성
+          # 날짜 YYYY-MM-DD 검증
           def validate_holiday_date!(date)
-            return unless date.present?
+            raise_invalid("holiday_date is required") unless date.present?
             Date.parse(date)
-          rescue ArgumentError
+          rescue
             raise_invalid("Invalid date format for holiday_date. Expected YYYY-MM-DD.")
           end
 
-          # 시간 유효성
-          def validate_times!(opening, closing)
-            return unless opening.present? && closing.present?
+          # 예외 시간 검증 로직 (핵심)
+          def validate_exception_time_format!(opening, closing)
+            # 둘 다 nil → 종일 휴무
+            return if opening.nil? && closing.nil?
 
+            # 둘 중 하나만 존재하면 invalid
+            if opening.present? && closing.blank?
+              raise_invalid("closing_time is required when opening_time is provided")
+            end
+            if closing.present? && opening.blank?
+              raise_invalid("opening_time is required when closing_time is provided")
+            end
+
+            # HH:MM 검증
             begin
-              start_time = Time.parse(opening)
-              end_time   = Time.parse(closing)
-            rescue ArgumentError
+              start_t = Time.parse(opening)
+              end_t   = Time.parse(closing)
+            rescue
               raise_invalid("Invalid time format. Expected HH:MM.")
             end
 
-            raise_invalid("Opening time must be before closing time") if start_time >= end_time
+            raise_invalid("opening_time must be before closing_time") if start_t >= end_t
           end
 
-          # 예외 날짜 중복
+          # 중복 날짜 예외 금지
           def validate_duplicate_exception!(room_id, date)
-            return unless date.present?
-
-            duplicate = ::RoomException.where(
-              room_id: room_id,
-              holiday_date: date,
-              deleted_at: nil
-            ).exists?
-
-            raise_already_exists("Holiday exception already exists for this date.") if duplicate
+            exists = ::RoomException.where(room_id: room_id, holiday_date: date, deleted_at: nil).exists?
+            raise_already_exists("Holiday exception already exists for this date.") if exists
           end
 
           def validate_duplicate_exception_on_update!(exception, date)
-            duplicate = ::RoomException.where(
-              room_id: exception.room_id,
-              holiday_date: date,
-              deleted_at: nil
-            ).where.not(id: exception.id).exists?
-
-            raise_already_exists("An exception already exists for this date.") if duplicate
+            exists = ::RoomException.where(room_id: exception.room_id,
+                                           holiday_date: date,
+                                           deleted_at: nil)
+                                    .where.not(id: exception.id)
+                                    .exists?
+            raise_already_exists("An exception already exists for this date.") if exists
           end
 
-          # 운영 시간과 겹치는지 검사 (문자열 기반 처리)
-          def exception_overlaps_operating_hours?(room, opening_str, closing_str)
-            ops = RoomOperatingHour.where(room_id: room.id)
-            return false if ops.empty?
-
-            start_t = Time.parse(opening_str)
-            end_t   = Time.parse(closing_str)
-
-            ops.any? do |op|
-              op_start = Time.parse(op.opening_time.to_s)
-              op_end   = Time.parse(op.closing_time.to_s)
-
-              (start_t < op_end) && (end_t > op_start)
-            end
-          end
-
-          # proto 변환 (strftime 제거)
+          # proto 변환
           def room_exception_to_proto(exception)
             Bannote::Studyroomservice::Roomexception::V1::RoomException.new(
               id: exception.id,
               room_id: exception.room_id,
               holiday_date: exception.holiday_date.to_s,
               reason: exception.reason,
-              opening_time: exception.opening_time&.to_s,
-              closing_time: exception.closing_time&.to_s,
+              opening_time: exception.opening_time,
+              closing_time: exception.closing_time,
               created_by: exception.created_by,
               created_at: Google::Protobuf::Timestamp.new(seconds: exception.created_at.to_i),
               updated_at: Google::Protobuf::Timestamp.new(seconds: exception.updated_at.to_i)
             )
           end
+
+          # 공통 에러/권한
+          def raise_not_found(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, msg); end
+          def raise_invalid(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, msg); end
+          def raise_precondition(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::FAILED_PRECONDITION, msg); end
+          def raise_already_exists(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::ALREADY_EXISTS, msg); end
+
+          def authorize!(required_role)
+            user_role = Current.user_role.to_s
+            unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]
+              raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, "Permission denied")
+            end
+          end
+
         end
       end
     end

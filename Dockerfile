@@ -1,7 +1,7 @@
 FROM ruby:3.2
 
-WORKDIR /rails
-COPY . /rails
+WORKDIR /studyroom_service
+COPY . /studyroom_service
 
 RUN apt-get update -qq && apt-get install -y build-essential libpq-dev nodejs default-mysql-client wget
 RUN gem install bundler rails
