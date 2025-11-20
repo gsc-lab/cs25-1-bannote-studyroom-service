@@ -73,8 +73,8 @@ module Bannote
             authorize!("assistant")
 
             page      = request.page.to_i <= 0 ? 1 : request.page.to_i
-            page_size = request.page_size.to_i <= 0 ? 20 : request.page_size.to_i
-            offset    = (page - 1) * page_size
+            size = request.size.to_i <= 0 ? 20 : request.size.to_i
+            offset    = (page - 1) * size
 
             total_count = ::Room.where(deleted_at: nil).count
 
@@ -82,7 +82,7 @@ module Bannote
                       .where(deleted_at: nil)
                       .order(created_at: :desc)
                       .offset(offset)
-                      .limit(page_size)
+                      .limit(size)
 
             room_responses = rooms.map { |room| room_to_proto(room) }
 
@@ -90,7 +90,7 @@ module Bannote
               rooms: room_responses,
               total_count: total_count,
               page: page,
-              page_size: page_size
+              size: size
             )
           end
 

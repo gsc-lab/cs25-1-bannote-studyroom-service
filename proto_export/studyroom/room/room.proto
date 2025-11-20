@@ -59,14 +59,14 @@ message GetRoomResponse {
 // ==========================================
 message ListRoomsRequest {
   int32 page = 1;        // 1부터 시작
-  int32 page_size = 2;   // 리미트 없음
+  int32 size = 2;   // 리미트 없음
 }
 
 message ListRoomsResponse {
   repeated Room rooms = 1;   // 해당 페이지 데이터
   int64 total_count = 2;     // 전체 개수
   int32 page = 3;            // 현재 페이지
-  int32 page_size = 4;       // 페이지 크기
+  int32 size = 4;       // 페이지 크기
 }
 
 // ==========================================
