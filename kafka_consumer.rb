@@ -1,9 +1,8 @@
 require "kafka"
 
-kafka = Kafka.new(["localhost:9095"])
+kafka = Kafka.new(["localhost:9092"])
 
 puts "Starting consumer..."
-
 
 group_id = "studyroom-test-#{rand(100000)}"
 consumer = kafka.consumer(group_id: group_id)
