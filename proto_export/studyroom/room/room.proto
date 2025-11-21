@@ -36,7 +36,6 @@ message CreateRoomRequest {
   string department_name = 2;
   string name = 3;
   int32 maximum_member = 4;
-  RoomStatus status = 5;
 }
 
 message CreateRoomResponse {
@@ -78,7 +77,6 @@ message UpdateRoomRequest {
   string department_name = 3;
   string name = 4;
   int32 maximum_member = 5;
-  RoomStatus status = 6;
 }
 
 message UpdateRoomResponse {

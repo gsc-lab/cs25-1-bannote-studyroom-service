@@ -23,7 +23,7 @@ module Bannote
           }.freeze
 
           # =========================================
-          # 1. 방 생성
+          # 1. 방 생성 (status 자동 설정)
           # =========================================
           def create_room(request, _call)
             authorize!("assistant")
@@ -34,7 +34,7 @@ module Bannote
                 department_name: request.department_name.to_s.strip.presence,
                 name: request.name,
                 maximum_member: request.maximum_member,
-                status: request.status,
+                status: "vacant",
                 created_by: Current.user_code
               )
 
@@ -72,9 +72,9 @@ module Bannote
           def list_rooms(request, _call)
             authorize!("assistant")
 
-            page      = request.page.to_i <= 0 ? 1 : request.page.to_i
+            page = request.page.to_i <= 0 ? 1 : request.page.to_i
             size = request.size.to_i <= 0 ? 20 : request.size.to_i
-            offset    = (page - 1) * size
+            offset = (page - 1) * size
 
             total_count = ::Room.where(deleted_at: nil).count
 
@@ -95,7 +95,7 @@ module Bannote
           end
 
           # =========================================
-          # 4. 방 수정
+          # 4. 방 수정 (status는 자동관리 → 수정 불가)
           # =========================================
           def update_room(request, _call)
             authorize!("assistant")
@@ -109,8 +109,8 @@ module Bannote
                 department_code: request.department_code.presence || room.department_code,
                 department_name: request.department_name.presence || room.department_name,
                 name: request.name || room.name,
-                maximum_member: request.maximum_member || room.maximum_member,
-                status: request.status
+                maximum_member: request.maximum_member || room.maximum_member
+                # status 제거 → 자동관리
               )
 
               Bannote::Studyroomservice::Room::V1::UpdateRoomResponse.new(
@@ -179,7 +179,7 @@ module Bannote
             )
           end
 
-          # Room → Proto 변환 (timestamp 포함)
+          # Room → Proto 변환
           def room_to_proto(room)
             Bannote::Studyroomservice::Room::V1::Room.new(
               id: room.id,
