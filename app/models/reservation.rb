@@ -13,13 +13,15 @@ class Reservation < ApplicationRecord
   # Validations
   # ========================================
   validates :code, presence: true, uniqueness: true
-  validates :group_id, presence: true
   validates :purpose, presence: true
   validates :priority, presence: true
   validates :start_time, presence: true
   validates :end_time, presence: true
 
-  validate  :start_time_before_end_time
+  validate :start_time_before_end_time
+
+  # group_id는 더 이상 사용하지 않으므로 validation 제거
+  # user_id도 제거됨 → user_codes(JSON)로 대체됨
 
   # ========================================
   # Default scope (Soft delete)
@@ -47,6 +49,10 @@ class Reservation < ApplicationRecord
   # ========================================
   def set_defaults
     self.priority ||= 0
+
+    # 매우 중요: MySQL JSON 컬럼은 기본값을 DB에서는 줄 수 없기 때문에
+    # Rails에서 기본값을 강제로 주어야 함
+    self.user_codes ||= []
   end
 
   # ========================================

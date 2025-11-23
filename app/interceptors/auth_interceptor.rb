@@ -18,6 +18,8 @@ class AuthInterceptor < GRPC::ServerInterceptor
     user_code = call.metadata['x-user-code']
     user_role = (call.metadata['x-user-role'] || "student").to_s.downcase
 
+    roles = user_role.split(',').map { |r| r.strip }
+
     if user_code.nil? || user_code.empty?
       raise UNAUTHENTICATED
     end

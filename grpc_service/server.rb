@@ -9,21 +9,13 @@ require 'grpc'
 require_relative '../config/environment'
 
 # =====================================================
-# 2. gRPC 관련 폴더를 Zeitwerk 자동 로드에서 제외
-# =====================================================
-if defined?(Rails) && Rails.respond_to?(:autoloaders)
-  Rails.autoloaders.main.ignore(Rails.root.join('app/grpc'))
-  puts "[Rails] Ignored app/grpc directory from autoload & eager_load"
-end
-
-# =====================================================
-# 3. gRPC 파일 경로 등록
+# 2. gRPC 파일 경로 등록
 # =====================================================
 $LOAD_PATH.unshift(File.expand_path('../app/grpc', __dir__))
 $LOAD_PATH.unshift(File.expand_path('../app', __dir__))
 
 # =====================================================
-# 4. Proto 파일 로드
+# 3. Proto 파일 로드
 # =====================================================
 require 'room/room_pb'
 require 'room/service_pb'
@@ -45,7 +37,7 @@ require 'healthcheck/healthcheck_pb'
 require 'healthcheck/healthcheck_services_pb'
 
 # =====================================================
-# 5. 서비스 핸들러 로드
+# 4. 서비스 핸들러 로드
 # =====================================================
 require_relative 'service/room_service'
 require_relative 'service/reservation_service'
@@ -54,12 +46,12 @@ require_relative 'service/room_exception_service'
 require_relative 'service/healthcheck_service'
 
 # =====================================================
-# 6. 인증 인터셉터 로드
+# 5. 인증 인터셉터 로드
 # =====================================================
 require_relative '../app/interceptors/auth_interceptor'
 
 # =====================================================
-# 7. gRPC 서버 실행
+# 6. gRPC 서버 실행
 # =====================================================
 module Bannote
   module Studyroomservice

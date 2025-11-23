@@ -34,7 +34,7 @@ module Bannote
                 department_name: request.department_name.to_s.strip.presence,
                 name: request.name,
                 maximum_member: request.maximum_member,
-                status: "vacant",
+                status: "Empty", # 기본값은 'Empty'
                 created_by: Current.user_code
               )
 

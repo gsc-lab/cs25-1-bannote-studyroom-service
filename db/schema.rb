@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_11_19_092833) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_23_140521) do
   create_table "departments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "name", null: false
     t.string "code", null: false
@@ -19,24 +19,31 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_19_092833) do
     t.index ["code"], name: "index_departments_on_code", unique: true
   end
 
+  create_table "reservation_users", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "reservation_id", null: false
+    t.bigint "user_code", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["reservation_id", "user_code"], name: "index_reservation_users_on_reservation_id_and_user_code", unique: true
+    t.index ["reservation_id"], name: "index_reservation_users_on_reservation_id"
+    t.index ["user_code"], name: "index_reservation_users_on_user_code"
+  end
+
   create_table "reservations", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "room_id", null: false
     t.datetime "start_time"
     t.datetime "end_time"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "group_id", null: false
-    t.bigint "link_id"
     t.string "purpose", null: false
     t.integer "priority", null: false
     t.datetime "deleted_at"
-    t.bigint "user_id"
     t.string "code", null: false
     t.string "created_by"
     t.string "deleted_by"
+    t.json "user_codes"
+    t.integer "status", default: 1
     t.index ["code"], name: "index_reservations_on_code", unique: true
-    t.index ["group_id"], name: "index_reservations_on_group_id"
-    t.index ["link_id"], name: "index_reservations_on_link_id"
     t.index ["room_id"], name: "index_reservations_on_room_id"
   end
 
