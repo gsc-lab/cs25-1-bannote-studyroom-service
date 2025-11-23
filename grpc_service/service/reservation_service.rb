@@ -47,9 +47,17 @@ module Bannote
             ex_end_hour,   ex_end_min   = parse_hhmm(ex.closing_time)
 
             start_before_ex_end = (st_h < ex_end_hour) || (st_h == ex_end_hour && st_m < ex_end_min)
-            end_after_ex_start  = (et_h > ex_start_hour) || (et_h == ex_start_hour && et_m > ex_start_min)
+            end_after_ex_start  = (et_h > ex_start_hour) || (et_h == ex_start_hour && et_m > ex_end_min)
 
             start_before_ex_end && end_after_ex_start
+          end
+
+          # -----------------------------------------------------------
+          # timestamp → Time(Zoned) 변환 (중복 체크 핵심)
+          # -----------------------------------------------------------
+          def to_local_time(ts)
+            return nil if ts.nil? || ts.seconds.nil?
+            Time.at(ts.seconds).in_time_zone("Asia/Seoul")
           end
 
           # ===========================================================
@@ -58,8 +66,8 @@ module Bannote
           def create_reservation(request, _call)
             authorize!("student")
 
-            start_time = request.start_time&.seconds ? Time.at(request.start_time.seconds) : nil
-            end_time   = request.end_time&.seconds ? Time.at(request.end_time.seconds) : nil
+            start_time = to_local_time(request.start_time)
+            end_time   = to_local_time(request.end_time)
 
             raise_invalid("start_time is required") unless start_time
             raise_invalid("end_time is required") unless end_time
@@ -98,9 +106,15 @@ module Bannote
             user_codes = request.user_codes.to_a
             raise_invalid("user_codes cannot be empty") if user_codes.empty?
 
-            # user_codes.each do |code|
-            #   raise_invalid("Invalid user_code #{code}") unless ::User.exists?(user_code: code)
-            # end
+            # ---------------------------
+            # 🔥 중복 체크 (완전 정상 버전)
+            # ---------------------------
+            overlap = ::Reservation
+                      .where(room_id: room.id)
+                      .where("start_time < ? AND end_time > ?", end_time, start_time)
+                      .exists?
+
+            raise_precondition("Reservation time overlaps") if overlap
 
             reservation = ::Reservation.create!(
               room_id: request.room_id,
@@ -108,7 +122,7 @@ module Bannote
               end_time: end_time,
               purpose: request.purpose,
               priority: request.priority,
-              status: 1, # 기본 CONFIRMED
+              status: 1,  # CONFIRMED
               user_codes: user_codes,
               created_by: Current.user_code
             )
@@ -119,7 +133,7 @@ module Bannote
           end
 
           # ===========================================================
-          # 2. 예약 단건 조회
+          # 2. 단건 조회
           # ===========================================================
           def get_reservation(request, _call)
             authorize!("student")
@@ -135,15 +149,15 @@ module Bannote
           end
 
           # ===========================================================
-          # 3. 예약 목록 조회
+          # 3. 목록 조회
           # ===========================================================
           def list_reservations(request, _call)
             authorize!("student")
 
             reservations = ::Reservation.where(deleted_at: nil)
             reservations = reservations.where(room_id: request.room_id) if request.room_id.present?
-            reservations = reservations.where("start_time >= ?", Time.at(request.start_time_after.seconds)) if request.start_time_after&.seconds
-            reservations = reservations.where("end_time <= ?", Time.at(request.end_time_before.seconds)) if request.end_time_before&.seconds
+            reservations = reservations.where("start_time >= ?", to_local_time(request.start_time_after)) if request.start_time_after&.seconds
+            reservations = reservations.where("end_time <= ?", to_local_time(request.end_time_before)) if request.end_time_before&.seconds
 
             ListReservationsResponse.new(
               reservations: reservations.map { |r| reservation_to_proto(r) }
@@ -160,15 +174,16 @@ module Bannote
             raise_not_found("Reservation") if reservation.deleted_at.present?
             raise_permission("Not allowed") unless can_modify?(Current.user_role)
 
-            start_time = request.start_time ? Time.at(request.start_time.seconds) : reservation.start_time
-            end_time   = request.end_time ? Time.at(request.end_time.seconds) : reservation.end_time
+            start_time = request.start_time ? to_local_time(request.start_time) : reservation.start_time
+            end_time   = request.end_time ? to_local_time(request.end_time) : reservation.end_time
+
             raise_invalid("start_time must be earlier than end_time") if start_time >= end_time
 
             room = ::Room.find_by(id: request.room_id || reservation.room_id)
             raise_not_found("Room") unless room
             raise_precondition("Cannot reserve a deleted room") if room.deleted_at.present?
 
-            # operating hour
+            # 운영시간
             op = ::RoomOperatingHour.find_by(
               room_id: room.id,
               day_of_week: start_time.wday,
@@ -178,19 +193,16 @@ module Bannote
             raise_precondition("Outside operating hours") unless within_operating_hours?(start_time, end_time, op)
 
             # 중복 체크
-            overlap = ::Reservation.where(room_id: room.id, deleted_at: nil)
-                                   .where("start_time < ? AND end_time > ?", end_time, start_time)
-                                   .where.not(id: reservation.id)
-                                   .exists?
+            overlap = ::Reservation
+                      .where(room_id: room.id)
+                      .where("start_time < ? AND end_time > ?", end_time, start_time)
+                      .where.not(id: reservation.id)
+                      .exists?
+
             raise_precondition("Reservation time overlaps") if overlap
 
             # user_codes 업데이트
-            if request.user_codes.any?
-              request.user_codes.each do |code|
-                raise_invalid("Invalid user_code #{code}") unless ::User.exists?(user_code: code)
-              end
-              reservation.user_codes = request.user_codes.to_a
-            end
+            reservation.user_codes = request.user_codes.to_a if request.user_codes.any?
 
             reservation.update!(
               room_id: request.room_id || reservation.room_id,
