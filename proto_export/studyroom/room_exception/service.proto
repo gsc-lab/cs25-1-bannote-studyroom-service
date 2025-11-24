@@ -2,25 +2,16 @@ syntax = "proto3";
 
 package bannote.studyroomservice.roomexception.v1;
 
+import "google/protobuf/empty.proto";
 import "room_exception/room_exception.proto";
 
-// ================================
-// RoomException Service
-// - 스터디룸의 일회성 휴무/특별 운영시간(예외)을 관리하는 서비스
-// ================================
 service RoomExceptionService {
-  // 스터디룸 예외 생성
-  rpc CreateRoomException (CreateRoomExceptionRequest) returns (CreateRoomExceptionResponse);
 
-  // 특정 스터디룸 예외 조회
-  rpc GetRoomException (GetRoomExceptionRequest) returns (GetRoomExceptionResponse);
+  // 전체 조회 (room_id 기준)
+  rpc GetRoomExceptions(GetRoomExceptionsRequest)
+      returns (GetRoomExceptionsResponse);
 
-  // 스터디룸 예외 목록 조회
-  rpc ListRoomExceptions (ListRoomExceptionsRequest) returns (ListRoomExceptionsResponse);
-
-  // 스터디룸 예외 정보 업데이트
-  rpc UpdateRoomException (UpdateRoomExceptionRequest) returns (UpdateRoomExceptionResponse);
-
-  // 스터디룸 예외 삭제 (소프트 삭제)
-  rpc DeleteRoomException (DeleteRoomExceptionRequest) returns (DeleteRoomExceptionResponse);
+  // 리스트 기반 전체 업데이트
+  rpc UpdateRoomExceptions(UpdateRoomExceptionsRequest)
+      returns (google.protobuf.Empty);
 }

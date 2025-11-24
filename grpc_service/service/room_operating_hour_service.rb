@@ -1,32 +1,31 @@
+# frozen_string_literal: true
+
 module Bannote
   module Studyroomservice
     module Roomoperatinghour
       module V1
         class RoomOperatingHourServiceHandler < RoomOperatingHourService::Service
 
-          # ---------------------------------------------------------
-          # 1. 전체 조회 (GetRoomOperatingHours)
-          # ---------------------------------------------------------
+          ROLE_PRIORITY = {
+            "student"   => 1,
+            "assistant" => 2,
+            "professor" => 3,
+            "admin"     => 4
+          }.freeze
+
+          # =========================================
+          # 1) 전체 조회 (GetRoomOperatingHours)
+          # =========================================
           def get_room_operating_hours(request, _call)
+            authorize!("student")
+
             room_id = request.room_id
 
             hours = ::RoomOperatingHour
                       .where(room_id: room_id, deleted_at: nil)
                       .order(:day_of_week)
 
-            response_hours = hours.map do |h|
-              RoomOperatingHour.new(
-                id: h.id,
-                room_id: h.room_id,
-                day_of_week: h.day_of_week,
-                opening_time: h.opening_time,
-                closing_time: h.closing_time,
-                day_maximum_time: h.day_maximum_time,
-                created_at: to_proto_timestamp(h.created_at),
-                updated_at: to_proto_timestamp(h.updated_at),
-                deleted_at: nil
-              )
-            end
+            response_hours = hours.map { |h| room_operating_hour_to_proto(h) }
 
             GetRoomOperatingHoursResponse.new(
               room_operating_hours: response_hours
@@ -34,75 +33,142 @@ module Bannote
           end
 
 
-          # ---------------------------------------------------------
-          # 2. 리스트 기반 업데이트 (UpdateRoomOperatingHours)
-          # ---------------------------------------------------------
+          # =========================================
+          # 2) 리스트 기반 전체 업데이트 (UpdateRoomOperatingHours)
+          # =========================================
           def update_room_operating_hours(request, _call)
-            room_id = request.room_id
+            authorize!("assistant")
 
+            room_id = request.room_id
             new_items = request.operating_hours.to_a
 
+            # ===== 리스트 내부 중복 방지 =====
+            day_list = new_items.map(&:day_of_week)
+            if day_list.size != day_list.uniq.size
+              raise_invalid("Duplicate day_of_week exists in request list")
+            end
+
             ActiveRecord::Base.transaction do
-              # DB 기존 항목
+              # DB 기존 항목 (요일 기준)
               existing = ::RoomOperatingHour
                            .where(room_id: room_id, deleted_at: nil)
-                           .index_by(&:id)
+                           .index_by(&:day_of_week)
 
-              # 신규 리스트에서 사용된 id 목록
-              received_ids = new_items.map(&:id).reject(&:zero?)
+              incoming_days = new_items.map(&:day_of_week)
 
               # -----------------------------
-              # A. 생성 + 업데이트 처리
+              # A. create + update
               # -----------------------------
               new_items.each do |item|
-                if item.id != 0 && existing[item.id]
-                  # ===== 1) 기존 항목 → 업데이트 =====
-                  record = existing[item.id]
-                  record.update!(
-                    day_of_week: item.day_of_week,
-                    opening_time: item.opening_time,
-                    closing_time: item.closing_time,
-                    day_maximum_time: item.day_maximum_time
-                  )
+                validate_day_of_week!(item.day_of_week)
+                validate_operating_time_format!(
+                  item.opening_time.presence,
+                  item.closing_time.presence
+                )
 
+                if existing[item.day_of_week]
+                  # ===== update =====
+                  record = existing[item.day_of_week]
+                  record.update!(
+                    opening_time: item.opening_time.presence,
+                    closing_time: item.closing_time.presence,
+                    day_maximum_time: item.day_maximum_time.presence
+                  )
                 else
-                  # ===== 2) 신규 항목 → 생성 =====
+                  # ===== create =====
                   ::RoomOperatingHour.create!(
                     room_id: room_id,
                     day_of_week: item.day_of_week,
-                    opening_time: item.opening_time,
-                    closing_time: item.closing_time,
-                    day_maximum_time: item.day_maximum_time
+                    opening_time: item.opening_time.presence,
+                    closing_time: item.closing_time.presence,
+                    day_maximum_time: item.day_maximum_time.presence
                   )
                 end
               end
 
               # -----------------------------
-              # B. 삭제 처리 (DB에는 있는데 새 리스트엔 없음)
+              # B. delete (요청에서 빠진 요일)
               # -----------------------------
-              ids_to_delete = existing.keys - received_ids
-
-              ::RoomOperatingHour.where(id: ids_to_delete)
-                                 .update_all(deleted_at: Time.current)
+              existing.each do |dow, record|
+                unless incoming_days.include?(dow)
+                  record.update!(deleted_at: Time.current)
+                end
+              end
             end
 
             Google::Protobuf::Empty.new
           end
 
 
-
-          # ---------------------------------------------------------
-          # 유틸: Ruby Time → gRPC Timestamp 변환
-          # ---------------------------------------------------------
+          # =========================================
+          # 🔥 유틸 & 검증
+          # =========================================
           private
+
+          def validate_day_of_week!(dow)
+            unless dow.between?(0, 6)
+              raise_invalid("day_of_week must be between 0 and 6")
+            end
+          end
+
+          def validate_operating_time_format!(opening, closing)
+            opening = opening.presence
+            closing = closing.presence
+
+            # 둘 다 nil이면 "운영시간 없음" 가능 → 통과
+            return if opening.nil? && closing.nil?
+
+            if opening.nil? && closing.present?
+              raise_invalid("opening_time is required when closing_time is provided")
+            end
+            if closing.nil? && opening.present?
+              raise_invalid("closing_time is required when opening_time is provided")
+            end
+
+            begin
+              start_t = Time.parse(opening)
+              end_t   = Time.parse(closing)
+            rescue
+              raise_invalid("Invalid time format. Expected HH:MM")
+            end
+
+            raise_invalid("opening_time must be before closing_time") if start_t >= end_t
+          end
+
+          # proto 변환
+          def room_operating_hour_to_proto(h)
+            RoomOperatingHour.new(
+              id: h.id,
+              room_id: h.room_id,
+              day_of_week: h.day_of_week,
+              opening_time: h.opening_time,
+              closing_time: h.closing_time,
+              day_maximum_time: h.day_maximum_time,
+              created_at: to_proto_timestamp(h.created_at),
+              updated_at: to_proto_timestamp(h.updated_at),
+              deleted_at: nil
+            )
+          end
 
           def to_proto_timestamp(time)
             return nil if time.nil?
-
             Google::Protobuf::Timestamp.new(
               seconds: time.to_i,
-              nanos:   time.nsec
+              nanos: time.nsec
             )
+          end
+
+          # 에러 유틸
+          def raise_not_found(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, msg); end
+          def raise_invalid(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, msg); end
+          def raise_precondition(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::FAILED_PRECONDITION, msg); end
+
+          # 권한 체크
+          def authorize!(required_role)
+            user_role = Current.user_role.to_s
+            unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]
+              raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, "Permission denied")
+            end
           end
 
         end

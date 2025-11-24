@@ -9,10 +9,6 @@ module Bannote
     module Roomexception
       module V1
         module RoomExceptionService
-          # ================================
-          # RoomException Service
-          # - 스터디룸의 일회성 휴무/특별 운영시간(예외)을 관리하는 서비스
-          # ================================
           class Service
 
             include ::GRPC::GenericService
@@ -21,16 +17,10 @@ module Bannote
             self.unmarshal_class_method = :decode
             self.service_name = 'bannote.studyroomservice.roomexception.v1.RoomExceptionService'
 
-            # 스터디룸 예외 생성
-            rpc :CreateRoomException, ::Bannote::Studyroomservice::Roomexception::V1::CreateRoomExceptionRequest, ::Bannote::Studyroomservice::Roomexception::V1::CreateRoomExceptionResponse
-            # 특정 스터디룸 예외 조회
-            rpc :GetRoomException, ::Bannote::Studyroomservice::Roomexception::V1::GetRoomExceptionRequest, ::Bannote::Studyroomservice::Roomexception::V1::GetRoomExceptionResponse
-            # 스터디룸 예외 목록 조회
-            rpc :ListRoomExceptions, ::Bannote::Studyroomservice::Roomexception::V1::ListRoomExceptionsRequest, ::Bannote::Studyroomservice::Roomexception::V1::ListRoomExceptionsResponse
-            # 스터디룸 예외 정보 업데이트
-            rpc :UpdateRoomException, ::Bannote::Studyroomservice::Roomexception::V1::UpdateRoomExceptionRequest, ::Bannote::Studyroomservice::Roomexception::V1::UpdateRoomExceptionResponse
-            # 스터디룸 예외 삭제 (소프트 삭제)
-            rpc :DeleteRoomException, ::Bannote::Studyroomservice::Roomexception::V1::DeleteRoomExceptionRequest, ::Bannote::Studyroomservice::Roomexception::V1::DeleteRoomExceptionResponse
+            # 전체 조회 (room_id 기준)
+            rpc :GetRoomExceptions, ::Bannote::Studyroomservice::Roomexception::V1::GetRoomExceptionsRequest, ::Bannote::Studyroomservice::Roomexception::V1::GetRoomExceptionsResponse
+            # 리스트 기반 전체 업데이트
+            rpc :UpdateRoomExceptions, ::Bannote::Studyroomservice::Roomexception::V1::UpdateRoomExceptionsRequest, ::Google::Protobuf::Empty
           end
 
           Stub = Service.rpc_stub_class
