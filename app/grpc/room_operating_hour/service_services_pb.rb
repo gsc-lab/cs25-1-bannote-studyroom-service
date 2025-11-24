@@ -11,7 +11,7 @@ module Bannote
         module RoomOperatingHourService
           # ================================
           # RoomOperatingHour Service
-          # - 스터디룸의 요일별 운영 시간을 관리하는 서비스
+          # 요일별 운영 시간 전체 조회 + 리스트 기반 업데이트
           # ================================
           class Service
 
@@ -21,16 +21,10 @@ module Bannote
             self.unmarshal_class_method = :decode
             self.service_name = 'bannote.studyroomservice.roomoperatinghour.v1.RoomOperatingHourService'
 
-            # 스터디룸 운영 시간 생성
-            rpc :CreateRoomOperatingHour, ::Bannote::Studyroomservice::Roomoperatinghour::V1::CreateRoomOperatingHourRequest, ::Bannote::Studyroomservice::Roomoperatinghour::V1::CreateRoomOperatingHourResponse
-            # 특정 스터디룸 운영 시간 조회
-            rpc :GetRoomOperatingHour, ::Bannote::Studyroomservice::Roomoperatinghour::V1::GetRoomOperatingHourRequest, ::Bannote::Studyroomservice::Roomoperatinghour::V1::GetRoomOperatingHourResponse
-            # 스터디룸 운영 시간 목록 조회
-            rpc :ListRoomOperatingHours, ::Bannote::Studyroomservice::Roomoperatinghour::V1::ListRoomOperatingHoursRequest, ::Bannote::Studyroomservice::Roomoperatinghour::V1::ListRoomOperatingHoursResponse
-            # 스터디룸 운영 시간 정보 업데이트
-            rpc :UpdateRoomOperatingHour, ::Bannote::Studyroomservice::Roomoperatinghour::V1::UpdateRoomOperatingHourRequest, ::Bannote::Studyroomservice::Roomoperatinghour::V1::UpdateRoomOperatingHourResponse
-            # 스터디룸 운영 시간 삭제 (소프트 삭제)
-            rpc :DeleteRoomOperatingHour, ::Bannote::Studyroomservice::Roomoperatinghour::V1::DeleteRoomOperatingHourRequest, ::Bannote::Studyroomservice::Roomoperatinghour::V1::DeleteRoomOperatingHourResponse
+            # 전체 조회 (room_id 기준)
+            rpc :GetRoomOperatingHours, ::Bannote::Studyroomservice::Roomoperatinghour::V1::GetRoomOperatingHoursRequest, ::Bannote::Studyroomservice::Roomoperatinghour::V1::GetRoomOperatingHoursResponse
+            # 리스트 기반 전체 업데이트
+            rpc :UpdateRoomOperatingHours, ::Bannote::Studyroomservice::Roomoperatinghour::V1::UpdateRoomOperatingHoursRequest, ::Google::Protobuf::Empty
           end
 
           Stub = Service.rpc_stub_class

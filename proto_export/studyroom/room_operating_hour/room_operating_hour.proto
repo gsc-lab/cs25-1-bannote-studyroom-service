@@ -3,72 +3,63 @@ syntax = "proto3";
 package bannote.studyroomservice.roomoperatinghour.v1;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
-// 스터디룸 운영 시간 메시지 구조
+// ------------------------------------
+// RoomOperatingHour
+// ------------------------------------
 message RoomOperatingHour {
-  int64 id = 1;                               // 운영 시간 ID
-  int64 room_id = 2;                          // 스터디룸 ID
-  int32 day_of_week = 3;                      // 요일 (0:일요일 ~ 6:토요일)
-  string opening_time = 4;                    // 여는 시간 (HH:MM)
-  string closing_time = 5;                    // 닫는 시간 (HH:MM)
-  string day_maximum_time = 6;                // 하루 최대 예약 가능 시간 (HH:MM)
-  google.protobuf.Timestamp created_at = 7;   // 생성 시각
-  google.protobuf.Timestamp updated_at = 8;   // 수정 시각
-  google.protobuf.Timestamp deleted_at = 9;   // 삭제 시각 (소프트 삭제)
-}
-
-// 생성 요청 / 응답
-message CreateRoomOperatingHourRequest {
-  int64 room_id = 1;
-  int32 day_of_week = 2;
-  string opening_time = 3;
-  string closing_time = 4;
-  string day_maximum_time = 5;
-}
-
-message CreateRoomOperatingHourResponse {
-  RoomOperatingHour room_operating_hour = 1;
-}
-
-// 단건 조회 요청 / 응답
-message GetRoomOperatingHourRequest {
-  int64 id = 1;
-}
-
-message GetRoomOperatingHourResponse {
-  RoomOperatingHour room_operating_hour = 1;
-}
-
-// 목록 조회 요청 / 응답
-message ListRoomOperatingHoursRequest {
-  int64 room_id = 1;        // 스터디룸 ID 필터
-  int32 day_of_week = 2;    // 요일 필터
-}
-
-message ListRoomOperatingHoursResponse {
-  repeated RoomOperatingHour room_operating_hours = 1;
-}
-
-// 수정 요청 / 응답
-message UpdateRoomOperatingHourRequest {
   int64 id = 1;
   int64 room_id = 2;
   int32 day_of_week = 3;
   string opening_time = 4;
   string closing_time = 5;
   string day_maximum_time = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp deleted_at = 9;
 }
 
-message UpdateRoomOperatingHourResponse {
-  RoomOperatingHour room_operating_hour = 1;
+// ------------------------------------
+// 전체 조회 요청 / 응답
+// ------------------------------------
+message GetRoomOperatingHoursRequest {
+  int64 room_id = 1;  // 특정 스터디룸의 운영시간 전체 조회
 }
 
-// 삭제 요청 / 응답
-message DeleteRoomOperatingHourRequest {
+message GetRoomOperatingHoursResponse {
+  repeated RoomOperatingHour room_operating_hours = 1;
+}
+
+// ------------------------------------
+// 리스트 기반 전체 업데이트 요청
+// ------------------------------------
+message UpdateRoomOperatingHoursRequest {
+  int64 room_id = 1;
+
+  // 리스트 기반 업데이트
+  repeated RoomOperatingHourUpdateItem operating_hours = 2;
+}
+
+// 업데이트용 item (id optional)
+message RoomOperatingHourUpdateItem {
   int64 id = 1;
+  int32 day_of_week = 2;
+  string opening_time = 3;
+  string closing_time = 4;
+  string day_maximum_time = 5;
 }
 
-message DeleteRoomOperatingHourResponse {
-  bool success = 1;
-  string message = 2;
-}
+// // ------------------------------------
+// // 서비스 정의 (GetAll + Update(List))
+// // ------------------------------------
+// service RoomOperatingHourService {
+
+//   // 전체 조회
+//   rpc GetRoomOperatingHours(GetRoomOperatingHoursRequest)
+//       returns (GetRoomOperatingHoursResponse);
+
+//   // 리스트 기반 업데이트
+//   rpc UpdateRoomOperatingHours(UpdateRoomOperatingHoursRequest)
+//       returns (google.protobuf.Empty);
+// }
