@@ -8,6 +8,15 @@ services:
       MYSQL_DATABASE: studyroom_service_development
     command: ["mysqld"]
     ports:
-      - "${DB_PORT:-3306}:3306"   # ← 외부 포트를 유동적으로
+      - "${DB_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - ban_note_shared_network
+
+volumes:
+  mysql_data:
+
+networks:
+  ban_note_shared_network:
+    external: true
