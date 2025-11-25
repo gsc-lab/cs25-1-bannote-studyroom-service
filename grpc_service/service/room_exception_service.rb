@@ -25,7 +25,7 @@ module Bannote
           def get_room_exceptions(request, _call)
             authorize!("student")
 
-            scope = RoomException.where(room_id: request.room_id, deleted_at: nil)
+            scope = ::RoomException.where(room_id: request.room_id, deleted_at: nil)
 
             # from_date, to_date 둘 다 있을 경우
             if request.from_date.present? && request.to_date.present?
