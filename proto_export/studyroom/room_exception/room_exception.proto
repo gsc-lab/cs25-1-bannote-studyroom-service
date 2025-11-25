@@ -19,6 +19,7 @@ message RoomException {
 message GetRoomExceptionsRequest {
   int64 room_id = 1;
   string from_date = 2;
+  string to_date = 3;
 }
 
 message GetRoomExceptionsResponse {
