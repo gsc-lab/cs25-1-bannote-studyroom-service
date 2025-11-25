@@ -2,6 +2,7 @@
 
 require 'grpc'
 require_relative '../../app/models/concerns/current'
+require_relative '../../grpc_service/common/role_priority'   # 추가
 
 class AuthInterceptor < GRPC::ServerInterceptor
   UNAUTHENTICATED = GRPC::BadStatus.new(
@@ -24,10 +25,14 @@ class AuthInterceptor < GRPC::ServerInterceptor
       raise UNAUTHENTICATED
     end
 
-    Current.user_code = user_code
-    Current.user_role = user_role
+    # 받은 값들 중 높은 권한 찾는 로직
+    highest_role = RolePriority.highest(roles)
 
-    puts "[AuthInterceptor] user_code=#{user_code}, user_role=#{user_role}"
+    # 가장 높은 권한으로 적용
+    Current.user_code = user_code
+    Current.user_role = highest_role
+
+    puts "[AuthInterceptor] user_code=#{user_code}, raw_roles=#{roles}, highest_role=#{highest_role}"
 
     yield
 
