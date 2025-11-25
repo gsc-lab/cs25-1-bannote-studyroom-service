@@ -25,12 +25,23 @@ module Bannote
           def get_room_exceptions(request, _call)
             authorize!("student")
 
+            # 기준 날짜 파싱
+            from_date = 
+              if request.from_date.present?
+                Date.parse(request.from_date)
+              else
+                Date.today # 기본 검색 기준은 현 시점으로 
+              end
+
             exceptions = ::RoomException
                            .where(room_id: request.room_id, deleted_at: nil)
+                           .where("holiday_date >= ?", from_date)
                            .order(:holiday_date)
 
+            response_items = exceptions.map { |ex| room_exception_to_proto(ex) }
+
             GetRoomExceptionsResponse.new(
-              room_exceptions: exceptions.map { |ex| room_exception_to_proto(ex) }
+              room_exceptions: response_items
             )
           end
 
