@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package bannote.studyroomservice.roomexception.v1;
 
+import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 message RoomException {
@@ -27,14 +28,20 @@ message GetRoomExceptionsResponse {
 }
 
 message RoomExceptionUpdateItem {
-  int64 id = 1;
-  string holiday_date = 2;
-  string reason = 3;
-  string opening_time = 4;
-  string closing_time = 5;
+  string holiday_date = 1;
+  string reason = 2;
+  string opening_time = 3;
+  string closing_time = 4;
 }
 
 message UpdateRoomExceptionsRequest {
   int64 room_id = 1;
-  repeated RoomExceptionUpdateItem exceptions = 2;
+  string from_date = 2;
+  string to_date = 3;
+  repeated RoomExceptionUpdateItem exceptions = 4;
+}
+
+message UpdateRoomExceptionsResponse {
+  string from_date = 1;
+  string to_date = 2;
 }

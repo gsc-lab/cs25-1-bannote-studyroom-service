@@ -25,18 +25,27 @@ module Bannote
           def get_room_exceptions(request, _call)
             authorize!("student")
 
-            # 기준 날짜 파싱
-            from_date = 
-              if request.from_date.present?
-                Date.parse(request.from_date)
-              else
-                Date.today # 기본 검색 기준은 현 시점으로 
-              end
+            scope = RoomException.where(room_id: request.room_id, deleted_at: nil)
 
-            exceptions = ::RoomException
-                           .where(room_id: request.room_id, deleted_at: nil)
-                           .where("holiday_date >= ?", from_date)
-                           .order(:holiday_date)
+            # from_date, to_date 둘 다 있을 경우
+            if request.from_date.present? && request.to_date.present?
+              start_date = Date.parse(request.from_date)
+              end_date = Date.parse(request.to_date)
+              scope = scope.where(holiday_date: start_date..end_date)
+              
+            # from_date 만 있는 경우
+            elsif request.from_date.present?
+              start_date = Date.parse(request.from_date)
+              scope = scope.where("holiday_date >= ?", start_date)
+
+            # to_date 만 있는 경우
+            elsif request.to_date.present?
+              end_date = Date.parse(request.to_date)
+              scope = scope.where("holiday_date <= ?", end_date)
+            end
+
+
+            exceptions = scope.order(:holiday_date)
 
             response_items = exceptions.map { |ex| room_exception_to_proto(ex) }
 
@@ -44,7 +53,6 @@ module Bannote
               room_exceptions: response_items
             )
           end
-
 
           # =========================================
           # 2) 리스트 기반 업데이트
