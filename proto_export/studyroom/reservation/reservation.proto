@@ -26,6 +26,15 @@ enum ReservationStatus {
 }
 
 // ===============================================
+// User 정보 (유저 서비스 연동용)
+// ===============================================
+message User {
+  int64 user_code = 1;
+  string name = 2;
+  string department = 3;
+}
+
+// ===============================================
 // 예약 정보
 // ===============================================
 message Reservation {
@@ -33,18 +42,20 @@ message Reservation {
   string code = 2;
   int64 room_id = 3;
 
-  // 여기만 string으로 변경
-  string start_time = 4;   // 프론트/백 간 텍스트 datetime
+  // string datetime
+  string start_time = 4;
   string end_time = 5;
 
   string purpose = 6;
   ReservationPriority priority = 7;
   ReservationStatus status = 8;
+
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
   google.protobuf.Timestamp deleted_at = 11;
 
   repeated int64 user_codes = 12;
+  repeated User users = 13;     // ← 추가됨
 }
 
 // ===============================================
@@ -52,8 +63,8 @@ message Reservation {
 // ===============================================
 message CreateReservationRequest {
   int64 room_id = 1;
-  string start_time = 2;     
-  string end_time = 3;       
+  string start_time = 2;
+  string end_time = 3;
   string purpose = 4;
   ReservationPriority priority = 5;
   repeated int64 user_codes = 6;
@@ -75,12 +86,12 @@ message GetReservationResponse {
 }
 
 // ===============================================
-// 3. 예약 목록 조회
+// 3. 예약 목록 조회 (여러 방 ID + 시간 범위)
 // ===============================================
 message ListReservationsRequest {
-  int64 room_id = 1;
-  string start_time_after = 2;  
-  string end_time_before = 3;   
+  repeated int64 room_ids = 1;
+  string start_time_after = 2;
+  string end_time_before = 3;
 }
 
 message ListReservationsResponse {
@@ -93,8 +104,8 @@ message ListReservationsResponse {
 message UpdateReservationRequest {
   string code = 1;
   int64 room_id = 2;
-  string start_time = 3;   
-  string end_time = 4;     
+  string start_time = 3;
+  string end_time = 4;
   string purpose = 5;
   ReservationPriority priority = 6;
   repeated int64 user_codes = 7;
