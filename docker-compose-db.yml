@@ -4,9 +4,15 @@ services:
     container_name: studyroom_db
     restart: always
     environment:
+      TZ: "Asia/Seoul"
       MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: studyroom_service_development
-    command: ["mysqld"]
+      MYSQL_ROOT_HOST: "%"
+    command: >
+      mysqld
+      --default-time-zone='+09:00'
+      --character-set-server=utf8mb4 
+      --collation-server=utf8mb4_unicode_ci
     ports:
       - "${DB_PORT:-3306}:3306"
     volumes:
