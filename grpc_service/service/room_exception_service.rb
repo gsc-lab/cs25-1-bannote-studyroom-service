@@ -54,76 +54,83 @@ module Bannote
             )
           end
 
-          # =========================================
-          # 2) 리스트 기반 업데이트
-          # =========================================
-          def update_room_exceptions(request, _call)
-            authorize!("assistant")
+            # =========================================
+            # 2) 범위 기반 업데이트 
+            # =========================================
+            def update_room_exceptions(request, _call)
+              authorize!("assistant")
 
-            room_id = request.room_id
-            new_items = request.exceptions.to_a
+              room_id   = request.room_id
+              from_date = Date.parse(request.from_date)
+              to_date   = request.to_date.present? ? Date.parse(request.to_date) : nil
 
-            # -----------------------------
-            # 내부 중복 날짜 검증
-            # -----------------------------
-            incoming_dates = new_items.map(&:holiday_date).map(&:to_s)
-            if incoming_dates.uniq.size != incoming_dates.size
-              raise_invalid("Duplicate holiday_date exists in request list")
-            end
-
-            ActiveRecord::Base.transaction do
-              # DB 기존 데이터 (holiday_date 기준)
-              existing = ::RoomException
-                           .where(room_id: room_id, deleted_at: nil)
-                           .index_by { |ex| ex.holiday_date.to_s }
+              incoming_items = request.exceptions.to_a
+              incoming_dates = incoming_items.map(&:holiday_date).map(&:to_s)
 
               # -----------------------------
-              # A. create + update
+              # 범위에 해당하는 기존 데이터 읽기
               # -----------------------------
-              new_items.each do |item|
-                date_str = item.holiday_date.to_s
+              scope = ::RoomException.where(room_id: room_id, deleted_at: nil)
 
-                # 날짜 검증
-                validate_holiday_date!(date_str)
-
-                # 시간 검증
-                opening = item.opening_time.presence
-                closing = item.closing_time.presence
-                validate_exception_time_format!(opening, closing)
-
-                if existing[date_str]
-                  # === update ===
-                  record = existing[date_str]
-                  record.update!(
-                    reason: item.reason,
-                    opening_time: opening,
-                    closing_time: closing
-                  )
+              scope =
+                if to_date
+                  scope.where(holiday_date: from_date..to_date)
                 else
-                  # === create ===
-                  ::RoomException.create!(
-                    room_id:      room_id,
-                    holiday_date: date_str,
-                    reason:       item.reason,
-                    opening_time: opening,
-                    closing_time: closing,
-                    created_by:   Current.user_code
-                  )
+                  scope.where("holiday_date >= ?", from_date)
                 end
-              end
+
+              existing = scope.index_by { |ex| ex.holiday_date.to_s }
 
               # -----------------------------
-              # B. delete (요청 리스트에 없는 날짜 제거)
+              # 신규 + 수정 처리
               # -----------------------------
-              existing.each do |date_str, record|
-                unless incoming_dates.include?(date_str)
+              ActiveRecord::Base.transaction do
+                incoming_items.each do |item|
+                  date_str = item.holiday_date.to_s
+
+                  # 날짜와 시간 검증
+                  validate_holiday_date!(date_str)
+                  opening = item.opening_time.presence
+                  closing = item.closing_time.presence
+                  validate_exception_time_format!(opening, closing)
+
+                  if existing[date_str]
+                    # === UPDATE ===
+                    existing[date_str].update!(
+                      reason: item.reason,
+                      opening_time: opening,
+                      closing_time:  closing
+                    )
+                  else
+                    # === CREATE: 범위 안의 날짜만 생성 ===
+                    target_date = Date.parse(date_str)
+                    if to_date.nil? || (from_date..to_date).cover?(target_date)
+                      ::RoomException.create!(
+                        room_id:      room_id,
+                        holiday_date: date_str,
+                        reason:       item.reason,
+                        opening_time: opening,
+                        closing_time: closing,
+                        created_by:   Current.user_code
+                      )
+                    end
+                  end
+                end
+
+                # -----------------------------
+                # 삭제 처리 (범위 안인데 요청에 없는 날짜)
+                # -----------------------------
+                existing.each do |date_str, record|
+                  next if incoming_dates.include?(date_str)
                   record.update!(deleted_at: Time.current)
                 end
               end
-            end
 
-            Google::Protobuf::Empty.new
-          end
+              UpdateRoomExceptionsResponse.new(
+                from_date: request.from_date,
+                to_date:   request.to_date
+              )
+            end
 
 
           # =========================================
