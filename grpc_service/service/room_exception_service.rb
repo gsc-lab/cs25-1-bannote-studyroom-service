@@ -32,7 +32,7 @@ module Bannote
               start_date = Date.parse(request.from_date)
               end_date = Date.parse(request.to_date)
               scope = scope.where(holiday_date: start_date..end_date)
-              
+
             # from_date 만 있는 경우
             elsif request.from_date.present?
               start_date = Date.parse(request.from_date)
@@ -44,7 +44,6 @@ module Bannote
               scope = scope.where("holiday_date <= ?", end_date)
             end
 
-
             exceptions = scope.order(:holiday_date)
 
             response_items = exceptions.map { |ex| room_exception_to_proto(ex) }
@@ -54,89 +53,98 @@ module Bannote
             )
           end
 
-            # =========================================
-            # 2) 범위 기반 업데이트 
-            # =========================================
-            def update_room_exceptions(request, _call)
-              authorize!("assistant")
+          # =========================================
+          # 2) 범위 기반 업데이트
+          # =========================================
+          def update_room_exceptions(request, _call)
+            authorize!("assistant")
 
-              room_id   = request.room_id
-              from_date = Date.parse(request.from_date)
-              to_date   = request.to_date.present? ? Date.parse(request.to_date) : nil
+            room_id   = request.room_id
+            from_date = Date.parse(request.from_date)
+            to_date   = request.to_date.present? ? Date.parse(request.to_date) : nil
 
-              incoming_items = request.exceptions.to_a
-              incoming_dates = incoming_items.map(&:holiday_date).map(&:to_s)
+            incoming_items = request.exceptions.to_a
+            incoming_dates = incoming_items.map(&:holiday_date).map(&:to_s)
 
-              # -----------------------------
-              # 범위에 해당하는 기존 데이터 읽기
-              # -----------------------------
-              scope = ::RoomException.where(room_id: room_id, deleted_at: nil)
+            # -----------------------------
+            # 범위에 해당하는 기존 데이터 읽기
+            # -----------------------------
+            scope = ::RoomException.where(room_id: room_id, deleted_at: nil)
 
-              scope =
-                if to_date
-                  scope.where(holiday_date: from_date..to_date)
+            scope =
+              if to_date
+                scope.where(holiday_date: from_date..to_date)
+              else
+                scope.where("holiday_date >= ?", from_date)
+              end
+
+            existing = scope.index_by { |ex| ex.holiday_date.to_s }
+
+            # -----------------------------
+            # 신규 + 수정 처리
+            # -----------------------------
+            ActiveRecord::Base.transaction do
+              incoming_items.each do |item|
+                date_str = item.holiday_date.to_s
+
+                # 날짜 검증
+                validate_holiday_date!(date_str)
+
+                opening = item.opening_time.presence
+                closing = item.closing_time.presence
+
+                # ★★ HH:mm → 분 비교 방식으로 검증
+                validate_exception_time_format!(opening, closing)
+
+                if existing[date_str]
+                  # === UPDATE ===
+                  existing[date_str].update!(
+                    reason: item.reason,
+                    opening_time: opening,
+                    closing_time: closing
+                  )
                 else
-                  scope.where("holiday_date >= ?", from_date)
-                end
-
-              existing = scope.index_by { |ex| ex.holiday_date.to_s }
-
-              # -----------------------------
-              # 신규 + 수정 처리
-              # -----------------------------
-              ActiveRecord::Base.transaction do
-                incoming_items.each do |item|
-                  date_str = item.holiday_date.to_s
-
-                  # 날짜와 시간 검증
-                  validate_holiday_date!(date_str)
-                  opening = item.opening_time.presence
-                  closing = item.closing_time.presence
-                  validate_exception_time_format!(opening, closing)
-
-                  if existing[date_str]
-                    # === UPDATE ===
-                    existing[date_str].update!(
-                      reason: item.reason,
+                  # === CREATE ===
+                  target_date = Date.parse(date_str)
+                  if to_date.nil? || (from_date..to_date).cover?(target_date)
+                    ::RoomException.create!(
+                      room_id:      room_id,
+                      holiday_date: date_str,
+                      reason:       item.reason,
                       opening_time: opening,
-                      closing_time:  closing
+                      closing_time: closing,
+                      created_by:   Current.user_code
                     )
-                  else
-                    # === CREATE: 범위 안의 날짜만 생성 ===
-                    target_date = Date.parse(date_str)
-                    if to_date.nil? || (from_date..to_date).cover?(target_date)
-                      ::RoomException.create!(
-                        room_id:      room_id,
-                        holiday_date: date_str,
-                        reason:       item.reason,
-                        opening_time: opening,
-                        closing_time: closing,
-                        created_by:   Current.user_code
-                      )
-                    end
                   end
-                end
-
-                # -----------------------------
-                # 삭제 처리 (범위 안인데 요청에 없는 날짜)
-                # -----------------------------
-                existing.each do |date_str, record|
-                  next if incoming_dates.include?(date_str)
-                  record.update!(deleted_at: Time.current)
                 end
               end
 
-              UpdateRoomExceptionsResponse.new(
-                from_date: request.from_date,
-                to_date:   request.to_date
-              )
+              # -----------------------------
+              # 삭제 처리
+              # -----------------------------
+              existing.each do |date_str, record|
+                next if incoming_dates.include?(date_str)
+                record.update!(deleted_at: Time.current)
+              end
             end
 
+            UpdateRoomExceptionsResponse.new(
+              from_date: request.from_date,
+              to_date:   request.to_date
+            )
+          end
 
           # =========================================
           # 유틸 / 검증
           # =========================================
           private
+
+          # HH:mm → 분 변환 (운영시간과 동일)
+          def hhmm_to_minutes(hhmm)
+            return nil if hhmm.nil?
+            h, m = hhmm.split(":").map(&:to_i)
+            (h * 60) + m
+          end
 
           def validate_holiday_date!(date)
             raise_invalid("holiday_date is required") unless date.present?
@@ -145,11 +153,15 @@ module Bannote
             raise_invalid("Invalid date format for holiday_date. Expected YYYY-MM-DD.")
           end
 
+          # ================================
+          # ★ 여기 완전히 수정된 부분 ★
+          # Time.parse 제거 (UTC 문제 해결)
+          # ================================
           def validate_exception_time_format!(opening, closing)
             opening = opening.presence
             closing = closing.presence
 
-            # 둘 다 비어있으면 종일 휴무
+            # 둘 다 nil → 종일 휴무
             return if opening.nil? && closing.nil?
 
             if opening.nil? && closing.present?
@@ -160,13 +172,17 @@ module Bannote
             end
 
             begin
-              start_t = Time.parse(opening)
-              end_t   = Time.parse(closing)
+              start_m = hhmm_to_minutes(opening)
+              end_m   = hhmm_to_minutes(closing)
             rescue
               raise_invalid("Invalid time format. Expected HH:MM.")
             end
 
-            raise_invalid("opening_time must be before closing_time") if start_t >= end_t
+            if start_m.nil? || end_m.nil?
+              raise_invalid("Invalid time format. Expected HH:MM.")
+            end
+
+            raise_invalid("opening_time must be before closing_time") if start_m >= end_m
           end
 
           # proto 변환

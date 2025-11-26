@@ -23,26 +23,33 @@ module Bannote
           # 공통 함수
           # =====================================================================
 
-          # string datetime → Time(KST)
+          # ✔ 수정됨: 타임존 없는 문자열을 KST로 강제 해석
           def parse_datetime(str)
             return nil if str.blank?
+
+            # "2025-11-25T10:30" 처럼 TZ 없는 값 → KST로 강제 변환
+            if str =~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
+              return Time.zone.strptime(str, "%Y-%m-%dT%H:%M")
+            end
+
+            # 기존 ISO8601(+09:00, Z 포함) 입력은 그대로 Rails parse
             Time.zone.parse(str)
           end
 
-          # 날짜 + HH:mm → Time  (기존 그대로 둠 — 예외시간용)
+          # 날짜 + HH:mm → Time (예외시간 처리용, 그대로 유지)
           def combine_date_time(date, hhmm)
             h, m = hhmm.split(":").map(&:to_i)
             Time.new(date.year, date.month, date.day, h, m, 0, "+09:00")
           end
 
-          # HH:mm → 총 minutes 변환 (⭐ 새로 추가된 함수)
+          # HH:mm → minutes (신규 유지)
           def hhmm_to_minutes(hhmm)
             return Float::INFINITY if hhmm.nil? || hhmm.strip == ""
             h, m = hhmm.split(":").map(&:to_i)
             (h * 60) + m
           end
 
-          # 운영시간 체크 (⭐ 날짜 기반 Time 비교 → 분 비교로 변경)
+          # 운영시간 체크 (분 단위 비교)
           def within_operating_hours?(start_time, end_time, op)
             start_m = start_time.hour * 60 + start_time.min
             end_m   = end_time.hour * 60 + end_time.min
@@ -63,7 +70,7 @@ module Bannote
           end
 
           # =====================================================================
-          # UserService 연동 (현재는 MOCK 사용자 데이터)
+          # UserService 연동 (MOCK)
           # =====================================================================
 
           def fetch_users(user_codes)
@@ -103,12 +110,12 @@ module Bannote
             )
             raise_precondition("No operating hour defined") unless op
 
-            # 운영시간 체크 (⭐ 수정된 함수 사용)
+            # 운영시간 체크
             unless within_operating_hours?(start_time, end_time, op)
               raise_precondition("Reservation time is outside operating hours")
             end
 
-            # 최대 운영시간 체크 (⭐ HH:mm 기반으로 수정)
+            # 최대 운영시간 체크
             max_minutes = hhmm_to_minutes(op.day_maximum_time)
             duration_minutes = ((end_time - start_time) / 60).to_i
 
@@ -209,7 +216,7 @@ module Bannote
             room = ::Room.find_by(id: request.room_id || reservation.room_id)
             raise_not_found("Room") unless room
 
-            # 운영시간 검사 (⭐ 수정된 함수 사용)
+            # 운영시간 검사
             op = ::RoomOperatingHour.find_by(
               room_id: room.id,
               day_of_week: start_time.wday,

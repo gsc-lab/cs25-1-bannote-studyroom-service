@@ -49,7 +49,6 @@ module Bannote
             end
 
             ActiveRecord::Base.transaction do
-              # DB 기존 항목 (요일 기준)
               existing = ::RoomOperatingHour
                            .where(room_id: room_id, deleted_at: nil)
                            .index_by(&:day_of_week)
@@ -67,7 +66,6 @@ module Bannote
                 )
 
                 if existing[item.day_of_week]
-                  # ===== update =====
                   record = existing[item.day_of_week]
                   record.update!(
                     opening_time: item.opening_time.presence,
@@ -75,7 +73,6 @@ module Bannote
                     day_maximum_time: item.day_maximum_time.presence
                   )
                 else
-                  # ===== create =====
                   ::RoomOperatingHour.create!(
                     room_id: room_id,
                     day_of_week: item.day_of_week,
@@ -105,17 +102,28 @@ module Bannote
           # =========================================
           private
 
+          # HH:mm → 분 단위
+          def hhmm_to_minutes(hhmm)
+            return nil if hhmm.nil?
+            h, m = hhmm.split(":").map(&:to_i)
+            (h * 60) + m
+          end
+
           def validate_day_of_week!(dow)
             unless dow.between?(0, 6)
               raise_invalid("day_of_week must be between 0 and 6")
             end
           end
 
+          # ============================
+          # ★ 수정된 부분 (UTC 제거)
+          # HH:mm 비교를 분 단위로 수행
+          # ============================
           def validate_operating_time_format!(opening, closing)
             opening = opening.presence
             closing = closing.presence
 
-            # 둘 다 nil이면 "운영시간 없음" 가능 → 통과
+            # 둘 다 nil이면 운영시간 없음
             return if opening.nil? && closing.nil?
 
             if opening.nil? && closing.present?
@@ -126,13 +134,17 @@ module Bannote
             end
 
             begin
-              start_t = Time.parse(opening)
-              end_t   = Time.parse(closing)
+              start_m = hhmm_to_minutes(opening)
+              end_m   = hhmm_to_minutes(closing)
             rescue
               raise_invalid("Invalid time format. Expected HH:MM")
             end
 
-            raise_invalid("opening_time must be before closing_time") if start_t >= end_t
+            if start_m.nil? || end_m.nil?
+              raise_invalid("Invalid time format. Expected HH:MM")
+            end
+
+            raise_invalid("opening_time must be before closing_time") if start_m >= end_m
           end
 
           # proto 변환
