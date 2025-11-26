@@ -191,8 +191,8 @@ module Bannote
 
             reservations = reservations.where(room_id: request.room_ids.to_a) if request.room_ids.any?
 
-            reservations = reservations.where("start_time >= ?", parse_datetime(request.start_time_after)) if request.start_time_after.present?
-            reservations = reservations.where("end_time <= ?", parse_datetime(request.end_time_before))   if request.end_time_before.present?
+            reservations = reservations.where("start_time <= ?", parse_datetime(request.end_time_before)) if request.end_time_before.present?
+            reservations = reservations.where("end_time >= ?", parse_datetime(request.start_time_after)) if request.start_time_after.present?
 
             ListReservationsResponse.new(
               reservations: reservations.map { |r| reservation_to_proto(r) }
