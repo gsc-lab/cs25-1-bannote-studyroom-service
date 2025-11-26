@@ -29,22 +29,31 @@ module Bannote
             Time.zone.parse(str)
           end
 
-          # 날짜 + HH:mm → Time
+          # 날짜 + HH:mm → Time  (기존 그대로 둠 — 예외시간용)
           def combine_date_time(date, hhmm)
             h, m = hhmm.split(":").map(&:to_i)
             Time.new(date.year, date.month, date.day, h, m, 0, "+09:00")
           end
 
-          # 운영시간 체크
-          def within_operating_hours?(start_time, end_time, op)
-            date = start_time.to_date
-            op_start = combine_date_time(date, op.opening_time)
-            op_end   = combine_date_time(date, op.closing_time)
-
-            start_time >= op_start && end_time <= op_end
+          # HH:mm → 총 minutes 변환 (⭐ 새로 추가된 함수)
+          def hhmm_to_minutes(hhmm)
+            return Float::INFINITY if hhmm.nil? || hhmm.strip == ""
+            h, m = hhmm.split(":").map(&:to_i)
+            (h * 60) + m
           end
 
-          # 예외시간 체크
+          # 운영시간 체크 (⭐ 날짜 기반 Time 비교 → 분 비교로 변경)
+          def within_operating_hours?(start_time, end_time, op)
+            start_m = start_time.hour * 60 + start_time.min
+            end_m   = end_time.hour * 60 + end_time.min
+
+            op_start = hhmm_to_minutes(op.opening_time)
+            op_end   = hhmm_to_minutes(op.closing_time)
+
+            start_m >= op_start && end_m <= op_end
+          end
+
+          # 예외시간 체크 (기존 유지)
           def conflict_with_exception?(start_time, end_time, ex)
             date = start_time.to_date
             ex_start = combine_date_time(date, ex.opening_time)
@@ -60,23 +69,6 @@ module Bannote
           def fetch_users(user_codes)
             return [] if user_codes.blank?
 
-            # =======================
-            # (1) 실서비스 연동 버전
-            # =======================
-            # begin
-            #   stub = Bannote::Userservice::User::V1::UserService::Stub.new(
-            #       "user-service:50051", :this_channel_is_insecure
-            #   )
-            #   resp = stub.get_users(GetUsersRequest.new(user_codes: user_codes))
-            #   return resp.users
-            # rescue => e
-            #   Rails.logger.error("[UserService] fetch_users failed: #{e.message}")
-            #   return []
-            # end
-
-            # =======================
-            # (2) 현재 mock 데이터 버전
-            # =======================
             user_codes.map do |code|
               ::Bannote::Studyroomservice::Reservation::V1::User.new(
                 user_code: code,
@@ -111,15 +103,19 @@ module Bannote
             )
             raise_precondition("No operating hour defined") unless op
 
+            # 운영시간 체크 (⭐ 수정된 함수 사용)
             unless within_operating_hours?(start_time, end_time, op)
               raise_precondition("Reservation time is outside operating hours")
             end
 
-            # 최대 운영시간 체크
-            if op.day_maximum_time.present?
-              max_hours = op.day_maximum_time.to_i
-              duration_hours = (end_time - start_time) / 3600.0
-              raise_precondition("Reservation exceeds maximum operating time (#{max_hours} hours)") if duration_hours > max_hours
+            # 최대 운영시간 체크 (⭐ HH:mm 기반으로 수정)
+            max_minutes = hhmm_to_minutes(op.day_maximum_time)
+            duration_minutes = ((end_time - start_time) / 60).to_i
+
+            if duration_minutes > max_minutes
+              raise_precondition(
+                "Reservation exceeds maximum operating time (#{op.day_maximum_time})"
+              )
             end
 
             # 예외시간 확인
@@ -179,17 +175,15 @@ module Bannote
           end
 
           # =====================================================================
-          # 3. 목록 조회 (여러 개 room_id + 범위)
+          # 3. 목록 조회
           # =====================================================================
           def list_reservations(request, _call)
             authorize!("student")
 
             reservations = ::Reservation.where(deleted_at: nil)
 
-            # 여러 개 room_ids 처리
             reservations = reservations.where(room_id: request.room_ids.to_a) if request.room_ids.any?
 
-            # 시간 범위
             reservations = reservations.where("start_time >= ?", parse_datetime(request.start_time_after)) if request.start_time_after.present?
             reservations = reservations.where("end_time <= ?", parse_datetime(request.end_time_before))   if request.end_time_before.present?
 
@@ -215,7 +209,7 @@ module Bannote
             room = ::Room.find_by(id: request.room_id || reservation.room_id)
             raise_not_found("Room") unless room
 
-            # 운영시간 검사
+            # 운영시간 검사 (⭐ 수정된 함수 사용)
             op = ::RoomOperatingHour.find_by(
               room_id: room.id,
               day_of_week: start_time.wday,
@@ -235,7 +229,6 @@ module Bannote
                         .exists?
             raise_precondition("Reservation time overlaps") if overlap
 
-            # user_codes 업데이트
             reservation.user_codes = request.user_codes.to_a if request.user_codes.any?
 
             reservation.update!(
@@ -296,7 +289,6 @@ module Bannote
           def raise_permission(msg)
             raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, msg)
           end
-
 
           # ------------------------------------------------------------
           # Reservation → proto 변환 (users 포함)
