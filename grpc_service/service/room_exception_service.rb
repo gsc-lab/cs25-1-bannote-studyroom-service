@@ -59,16 +59,14 @@ module Bannote
           def update_room_exceptions(request, _call)
             authorize!("assistant")
 
-            room_id   = request.room_id
+            room_id = request.room_id
             from_date = Date.parse(request.from_date)
-            to_date   = request.to_date.present? ? Date.parse(request.to_date) : nil
+            to_date = request.to_date.present? ? Date.parse(request.to_date) : nil
 
             incoming_items = request.exceptions.to_a
             incoming_dates = incoming_items.map(&:holiday_date).map(&:to_s)
 
-            # -----------------------------
             # 범위에 해당하는 기존 데이터 읽기
-            # -----------------------------
             scope = ::RoomException.where(room_id: room_id, deleted_at: nil)
 
             scope =
@@ -80,9 +78,7 @@ module Bannote
 
             existing = scope.index_by { |ex| ex.holiday_date.to_s }
 
-            # -----------------------------
             # 신규 + 수정 처리
-            # -----------------------------
             ActiveRecord::Base.transaction do
               incoming_items.each do |item|
                 date_str = item.holiday_date.to_s
@@ -93,35 +89,32 @@ module Bannote
                 opening = item.opening_time.presence
                 closing = item.closing_time.presence
 
-                # ★★ HH:mm → 분 비교 방식으로 검증
                 validate_exception_time_format!(opening, closing)
 
                 if existing[date_str]
-                  # === UPDATE ===
                   existing[date_str].update!(
                     reason: item.reason,
                     opening_time: opening,
                     closing_time: closing
                   )
                 else
-                  # === CREATE ===
                   target_date = Date.parse(date_str)
                   if to_date.nil? || (from_date..to_date).cover?(target_date)
                     ::RoomException.create!(
-                      room_id:      room_id,
+                      room_id: room_id,
                       holiday_date: date_str,
-                      reason:       item.reason,
+                      reason: item.reason,
                       opening_time: opening,
                       closing_time: closing,
-                      created_by:   Current.user_code
+                      created_by: Current.user_code
                     )
                   end
                 end
               end
 
-              # -----------------------------
+  
               # 삭제 처리
-              # -----------------------------
+  
               existing.each do |date_str, record|
                 next if incoming_dates.include?(date_str)
                 record.update!(deleted_at: Time.current)
@@ -130,7 +123,7 @@ module Bannote
 
             UpdateRoomExceptionsResponse.new(
               from_date: request.from_date,
-              to_date:   request.to_date
+              to_date: request.to_date
             )
           end
 
@@ -139,7 +132,6 @@ module Bannote
           # =========================================
           private
 
-          # HH:mm → 분 변환 (운영시간과 동일)
           def hhmm_to_minutes(hhmm)
             return nil if hhmm.nil?
             h, m = hhmm.split(":").map(&:to_i)
@@ -153,15 +145,10 @@ module Bannote
             raise_invalid("Invalid date format for holiday_date. Expected YYYY-MM-DD.")
           end
 
-          # ================================
-          # ★ 여기 완전히 수정된 부분 ★
-          # Time.parse 제거 (UTC 문제 해결)
-          # ================================
           def validate_exception_time_format!(opening, closing)
             opening = opening.presence
             closing = closing.presence
 
-            # 둘 다 nil → 종일 휴무
             return if opening.nil? && closing.nil?
 
             if opening.nil? && closing.present?
@@ -173,7 +160,7 @@ module Bannote
 
             begin
               start_m = hhmm_to_minutes(opening)
-              end_m   = hhmm_to_minutes(closing)
+              end_m = hhmm_to_minutes(closing)
             rescue
               raise_invalid("Invalid time format. Expected HH:MM.")
             end

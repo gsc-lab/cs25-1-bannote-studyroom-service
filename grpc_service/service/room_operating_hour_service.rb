@@ -55,9 +55,8 @@ module Bannote
 
               incoming_days = new_items.map(&:day_of_week)
 
-              # -----------------------------
               # A. create + update
-              # -----------------------------
+
               new_items.each do |item|
                 validate_day_of_week!(item.day_of_week)
                 validate_operating_time_format!(
@@ -83,9 +82,7 @@ module Bannote
                 end
               end
 
-              # -----------------------------
               # B. delete (요청에서 빠진 요일)
-              # -----------------------------
               existing.each do |dow, record|
                 unless incoming_days.include?(dow)
                   record.update!(deleted_at: Time.current)
@@ -98,11 +95,10 @@ module Bannote
 
 
           # =========================================
-          # 🔥 유틸 & 검증
+          # 유틸 & 검증
           # =========================================
           private
 
-          # HH:mm → 분 단위
           def hhmm_to_minutes(hhmm)
             return nil if hhmm.nil?
             h, m = hhmm.split(":").map(&:to_i)
@@ -115,15 +111,10 @@ module Bannote
             end
           end
 
-          # ============================
-          # ★ 수정된 부분 (UTC 제거)
-          # HH:mm 비교를 분 단위로 수행
-          # ============================
           def validate_operating_time_format!(opening, closing)
             opening = opening.presence
             closing = closing.presence
 
-            # 둘 다 nil이면 운영시간 없음
             return if opening.nil? && closing.nil?
 
             if opening.nil? && closing.present?
@@ -135,7 +126,7 @@ module Bannote
 
             begin
               start_m = hhmm_to_minutes(opening)
-              end_m   = hhmm_to_minutes(closing)
+              end_m = hhmm_to_minutes(closing)
             rescue
               raise_invalid("Invalid time format. Expected HH:MM")
             end

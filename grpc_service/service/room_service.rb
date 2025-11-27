@@ -23,7 +23,7 @@ module Bannote
           }.freeze
 
           # =========================================
-          # 1. 방 생성 (status 자동 설정)
+          # 1. 방 생성
           # =========================================
           def create_room(request, _call)
             authorize!("assistant")
@@ -34,7 +34,7 @@ module Bannote
                 department_name: request.department_name.to_s.strip.presence,
                 name: request.name,
                 maximum_member: request.maximum_member,
-                status: "Empty", # 기본값은 'Empty'
+                status: "Empty",
                 created_by: Current.user_code
               )
 
@@ -95,7 +95,7 @@ module Bannote
           end
 
           # =========================================
-          # 4. 방 수정 (status는 자동관리 → 수정 불가)
+          # 4. 방 수정
           # =========================================
           def update_room(request, _call)
             authorize!("assistant")
@@ -110,7 +110,6 @@ module Bannote
                 department_name: request.department_name.presence || room.department_name,
                 name: request.name || room.name,
                 maximum_member: request.maximum_member || room.maximum_member
-                # status 제거 → 자동관리
               )
 
               Bannote::Studyroomservice::Room::V1::UpdateRoomResponse.new(

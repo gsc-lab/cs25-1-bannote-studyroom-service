@@ -36,7 +36,6 @@ module Bannote
             Time.zone.parse(str)
           end
 
-          # 날짜 + HH:mm → Time (예외시간 처리용, 그대로 유지)
           def combine_date_time(date, hhmm)
             h, m = hhmm.split(":").map(&:to_i)
             Time.new(date.year, date.month, date.day, h, m, 0, "+09:00")
@@ -52,10 +51,10 @@ module Bannote
           # 운영시간 체크 (분 단위 비교)
           def within_operating_hours?(start_time, end_time, op)
             start_m = start_time.hour * 60 + start_time.min
-            end_m   = end_time.hour * 60 + end_time.min
+            end_m = end_time.hour * 60 + end_time.min
 
             op_start = hhmm_to_minutes(op.opening_time)
-            op_end   = hhmm_to_minutes(op.closing_time)
+            op_end = hhmm_to_minutes(op.closing_time)
 
             start_m >= op_start && end_m <= op_end
           end
@@ -64,7 +63,7 @@ module Bannote
           def conflict_with_exception?(start_time, end_time, ex)
             date = start_time.to_date
             ex_start = combine_date_time(date, ex.opening_time)
-            ex_end   = combine_date_time(date, ex.closing_time)
+            ex_end = combine_date_time(date, ex.closing_time)
 
             (start_time < ex_end) && (end_time > ex_start)
           end
@@ -93,7 +92,7 @@ module Bannote
             authorize!("student")
 
             start_time = parse_datetime(request.start_time)
-            end_time   = parse_datetime(request.end_time)
+            end_time = parse_datetime(request.end_time)
             raise_invalid("start_time is required") unless start_time
             raise_invalid("end_time is required")   unless end_time
             raise_invalid("start_time must be earlier than end_time") if start_time >= end_time
@@ -209,7 +208,7 @@ module Bannote
             raise_not_found("Reservation") if reservation.deleted_at.present?
 
             start_time = request.start_time.present? ? parse_datetime(request.start_time) : reservation.start_time
-            end_time   = request.end_time.present?   ? parse_datetime(request.end_time)   : reservation.end_time
+            end_time = request.end_time.present?   ? parse_datetime(request.end_time)   : reservation.end_time
 
             raise_invalid("start_time must be earlier than end_time") if start_time >= end_time
 
@@ -297,9 +296,7 @@ module Bannote
             raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, msg)
           end
 
-          # ------------------------------------------------------------
           # Reservation → proto 변환 (users 포함)
-          # ------------------------------------------------------------
           def reservation_to_proto(res)
             users = fetch_users(res.user_codes)
 
