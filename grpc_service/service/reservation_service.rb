@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 require 'reservation/reservation_pb'
 require 'reservation/service_pb'
@@ -20,19 +20,19 @@ module Bannote
           }.freeze
 
           # =====================================================================
-          # 공통 함수
+          # 怨듯넻 ?⑥닔
           # =====================================================================
 
-          # ✔ 수정됨: 타임존 없는 문자열을 KST로 강제 해석
+          # ???섏젙?? ??꾩〈 ?녿뒗 臾몄옄?댁쓣 KST濡?媛뺤젣 ?댁꽍
           def parse_datetime(str)
             return nil if str.blank?
 
-            # "2025-11-25T10:30" 처럼 TZ 없는 값 → KST로 강제 변환
+            # "2025-11-25T10:30" 泥섎읆 TZ ?녿뒗 媛???KST濡?媛뺤젣 蹂??
             if str =~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
               return Time.zone.strptime(str, "%Y-%m-%dT%H:%M")
             end
 
-            # 기존 ISO8601(+09:00, Z 포함) 입력은 그대로 Rails parse
+            # 湲곗〈 ISO8601(+09:00, Z ?ы븿) ?낅젰? 洹몃?濡?Rails parse
             Time.zone.parse(str)
           end
 
@@ -41,14 +41,14 @@ module Bannote
             Time.new(date.year, date.month, date.day, h, m, 0, "+09:00")
           end
 
-          # HH:mm → minutes (신규 유지)
+          # HH:mm ??minutes (?좉퇋 ?좎?)
           def hhmm_to_minutes(hhmm)
             return Float::INFINITY if hhmm.nil? || hhmm.strip == ""
             h, m = hhmm.split(":").map(&:to_i)
             (h * 60) + m
           end
 
-          # 운영시간 체크 (분 단위 비교)
+          # ?댁쁺?쒓컙 泥댄겕 (遺??⑥쐞 鍮꾧탳)
           def within_operating_hours?(start_time, end_time, op)
             start_m = start_time.hour * 60 + start_time.min
             end_m = end_time.hour * 60 + end_time.min
@@ -59,7 +59,7 @@ module Bannote
             start_m >= op_start && end_m <= op_end
           end
 
-          # 예외시간 체크 (기존 유지)
+          # ?덉쇅?쒓컙 泥댄겕 (湲곗〈 ?좎?)
           def conflict_with_exception?(start_time, end_time, ex)
             date = start_time.to_date
             ex_start = combine_date_time(date, ex.opening_time)
@@ -69,7 +69,7 @@ module Bannote
           end
 
           # =====================================================================
-          # UserService 연동 (MOCK)
+          # UserService ?곕룞 (MOCK)
           # =====================================================================
 
           def fetch_users(user_codes)
@@ -86,7 +86,7 @@ module Bannote
 
 
           # =====================================================================
-          # 1. 예약 생성
+          # 1. ?덉빟 ?앹꽦
           # =====================================================================
           def create_reservation(request, _call)
             authorize!("student")
@@ -101,7 +101,7 @@ module Bannote
             raise_not_found("Room") unless room
             raise_precondition("Cannot reserve a deleted room") if room.deleted_at.present?
 
-            # 운영시간 조회
+            # ?댁쁺?쒓컙 議고쉶
             op = ::RoomOperatingHour.find_by(
               room_id: room.id,
               day_of_week: start_time.wday,
@@ -109,12 +109,12 @@ module Bannote
             )
             raise_precondition("No operating hour defined") unless op
 
-            # 운영시간 체크
+            # ?댁쁺?쒓컙 泥댄겕
             unless within_operating_hours?(start_time, end_time, op)
               raise_precondition("Reservation time is outside operating hours")
             end
 
-            # 최대 운영시간 체크
+            # 理쒕? ?댁쁺?쒓컙 泥댄겕
             max_minutes = hhmm_to_minutes(op.day_maximum_time)
             duration_minutes = ((end_time - start_time) / 60).to_i
 
@@ -124,7 +124,7 @@ module Bannote
               )
             end
 
-            # 예외시간 확인
+            # ?덉쇅?쒓컙 ?뺤씤
             exception = ::RoomException.find_by(
               room_id: room.id,
               holiday_date: start_time.to_date,
@@ -141,7 +141,7 @@ module Bannote
             user_codes = request.user_codes.to_a
             raise_invalid("user_codes cannot be empty") if user_codes.empty?
 
-            # 중복 체크
+            # 以묐났 泥댄겕
             overlap = ::Reservation
                         .where(room_id: room.id, deleted_at: nil)
                         .where("start_time < ? AND end_time > ?", end_time, start_time)
@@ -165,7 +165,7 @@ module Bannote
           end
 
           # =====================================================================
-          # 2. 단건 조회
+          # 2. ?④굔 議고쉶
           # =====================================================================
           def get_reservation(request, _call)
             authorize!("student")
@@ -181,7 +181,7 @@ module Bannote
           end
 
           # =====================================================================
-          # 3. 목록 조회
+          # 3. 紐⑸줉 議고쉶
           # =====================================================================
           def list_reservations(request, _call)
             authorize!("student")
@@ -199,7 +199,7 @@ module Bannote
           end
 
           # =====================================================================
-          # 4. 예약 수정
+          # 4. ?덉빟 ?섏젙
           # =====================================================================
           def update_reservation(request, _call)
             authorize!("student")
@@ -215,7 +215,7 @@ module Bannote
             room = ::Room.find_by(id: request.room_id || reservation.room_id)
             raise_not_found("Room") unless room
 
-            # 운영시간 검사
+            # ?댁쁺?쒓컙 寃??
             op = ::RoomOperatingHour.find_by(
               room_id: room.id,
               day_of_week: start_time.wday,
@@ -227,7 +227,7 @@ module Bannote
               raise_precondition("Outside operating hours")
             end
 
-            # 중복 체크
+            # 以묐났 泥댄겕
             overlap = ::Reservation
                         .where(room_id: room.id)
                         .where("start_time < ? AND end_time > ?", end_time, start_time)
@@ -251,7 +251,7 @@ module Bannote
           end
 
           # =====================================================================
-          # 5. 예약 삭제
+          # 5. ?덉빟 ??젣
           # =====================================================================
           def delete_reservation(request, _call)
             authorize!("student")
@@ -265,7 +265,7 @@ module Bannote
           end
 
           # =====================================================================
-          # 공통 변환
+          # 怨듯넻 蹂??
           # =====================================================================
           private
 
@@ -296,7 +296,7 @@ module Bannote
             raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, msg)
           end
 
-          # Reservation → proto 변환 (users 포함)
+          # Reservation ??proto 蹂??(users ?ы븿)
           def reservation_to_proto(res)
             users = fetch_users(res.user_codes)
 

@@ -1,2 +1,2 @@
-class RoomOperatingHoursController < ApplicationController
+﻿class RoomOperatingHoursController < ApplicationController
 end

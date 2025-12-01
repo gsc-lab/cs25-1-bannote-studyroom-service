@@ -1,2 +1,2 @@
-class RoomExceptionsController < ApplicationController
+﻿class RoomExceptionsController < ApplicationController
 end

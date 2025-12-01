@@ -1,8 +1,8 @@
-# db/seeds.rb
+﻿# db/seeds.rb
 
 rooms = [
-  { name: "스터디룸 A", capacity: 4, maximum_member: 4, status: 0 },
-  { name: "스터디룸 B", capacity: 6, maximum_member: 6, status: 0 }
+  { name: "?ㅽ꽣?붾８ A", capacity: 4, maximum_member: 4, status: 0 },
+  { name: "?ㅽ꽣?붾８ B", capacity: 6, maximum_member: 6, status: 0 }
 ]
 
 rooms.each do |room|
@@ -13,15 +13,15 @@ rooms.each do |room|
   end
 end
 
-puts "✅ Room seed data created successfully!"
+puts "??Room seed data created successfully!"
 
 # -------------------------
-# RoomOperatingHour 기본 데이터
+# RoomOperatingHour 湲곕낯 ?곗씠??
 # -------------------------
 rooms = Room.all
 
 rooms.each do |room|
-  (1..5).each do |day|  # 월~금
+  (1..5).each do |day|  # ??湲?
     RoomOperatingHour.find_or_create_by!(
       room_id: room.id,
       day_of_week: day,
@@ -31,15 +31,15 @@ rooms.each do |room|
   end
 end
 
-puts "✅ RoomOperatingHour seed created successfully!"
+puts "??RoomOperatingHour seed created successfully!"
 # -------------------------
-# RoomException (휴일)
+# RoomException (?댁씪)
 # -------------------------
 RoomException.find_or_create_by!(
   room_id: Room.first.id,
   holiday_date: "2025-10-25",
-  reason: "정기 점검",
+  reason: "?뺢린 ?먭?",
   created_by: 1
 )
 
-puts "✅ RoomException seed created successfully!"
+puts "??RoomException seed created successfully!"

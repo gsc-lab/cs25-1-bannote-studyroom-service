@@ -1,21 +1,21 @@
-#!/usr/bin/env ruby
+﻿#!/usr/bin/env ruby
 # frozen_string_literal: true
 
 require 'grpc'
 
 # =====================================================
-# 1. Rails 환경 로드
+# 1. Rails ?섍꼍 濡쒕뱶
 # =====================================================
 require_relative '../config/environment'
 
 # =====================================================
-# 2. gRPC 파일 경로 등록
+# 2. gRPC ?뚯씪 寃쎈줈 ?깅줉
 # =====================================================
 $LOAD_PATH.unshift(File.expand_path('../app/grpc', __dir__))
 $LOAD_PATH.unshift(File.expand_path('../app', __dir__))
 
 # =====================================================
-# 3. Proto 파일 로드
+# 3. Proto ?뚯씪 濡쒕뱶
 # =====================================================
 require 'room/room_pb'
 require 'room/service_pb'
@@ -37,7 +37,7 @@ require 'healthcheck/healthcheck_pb'
 require 'healthcheck/healthcheck_services_pb'
 
 # =====================================================
-# 4. 서비스 핸들러 로드
+# 4. ?쒕퉬???몃뱾??濡쒕뱶
 # =====================================================
 require_relative 'service/room_service'
 require_relative 'service/reservation_service'
@@ -46,12 +46,12 @@ require_relative 'service/room_exception_service'
 require_relative 'service/healthcheck_service'
 
 # =====================================================
-# 5. 인증 인터셉터 로드
+# 5. ?몄쬆 ?명꽣?됲꽣 濡쒕뱶
 # =====================================================
 require_relative '../app/interceptors/auth_interceptor'
 
 # =====================================================
-# 6. gRPC 서버 실행
+# 6. gRPC ?쒕쾭 ?ㅽ뻾
 # =====================================================
 module Bannote
   module Studyroomservice

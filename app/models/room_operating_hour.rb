@@ -1,7 +1,7 @@
-class RoomOperatingHour < ApplicationRecord
+﻿class RoomOperatingHour < ApplicationRecord
   belongs_to :room
 
-  # 기본 유효성 검사
+  # 湲곕낯 ?좏슚??寃??
   validates :room_id, presence: true
   validates :day_of_week, presence: true, numericality: { only_integer: true, in: 0..6 }
   validates :opening_time, presence: true
@@ -24,7 +24,7 @@ class RoomOperatingHour < ApplicationRecord
   private
 
   # ----------------------------------------
-  # opening_time < closing_time 검증
+  # opening_time < closing_time 寃利?
   # ----------------------------------------
   def validate_time_order
     return if opening_time.blank? || closing_time.blank?
@@ -40,7 +40,7 @@ class RoomOperatingHour < ApplicationRecord
   end
 
   # ----------------------------------------
-  # 동일 room_id + day_of_week 중복 금지
+  # ?숈씪 room_id + day_of_week 以묐났 湲덉?
   # ----------------------------------------
   def validate_day_of_week_duplication
     return if room_id.blank? || day_of_week.blank?

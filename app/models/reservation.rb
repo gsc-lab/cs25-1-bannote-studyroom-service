@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 class Reservation < ApplicationRecord
   belongs_to :room
@@ -20,8 +20,8 @@ class Reservation < ApplicationRecord
 
   validate :start_time_before_end_time
 
-  # group_id는 더 이상 사용하지 않으므로 validation 제거
-  # user_id도 제거됨 → user_codes(JSON)로 대체됨
+  # group_id?????댁긽 ?ъ슜?섏? ?딆쑝誘濡?validation ?쒓굅
+  # user_id???쒓굅????user_codes(JSON)濡??泥대맖
 
   # ========================================
   # Default scope (Soft delete)
@@ -50,8 +50,8 @@ class Reservation < ApplicationRecord
   def set_defaults
     self.priority ||= 0
 
-    # 매우 중요: MySQL JSON 컬럼은 기본값을 DB에서는 줄 수 없기 때문에
-    # Rails에서 기본값을 강제로 주어야 함
+    # 留ㅼ슦 以묒슂: MySQL JSON 而щ읆? 湲곕낯媛믪쓣 DB?먯꽌??以????녾린 ?뚮Ц??
+    # Rails?먯꽌 湲곕낯媛믪쓣 媛뺤젣濡?二쇱뼱????
     self.user_codes ||= []
   end
 
@@ -59,7 +59,7 @@ class Reservation < ApplicationRecord
   # Auto-generate code BEFORE validation
   # ========================================
   def generate_code
-    # UUID 앞 12자리 사용 (충돌 위험 감소)
+    # UUID ??12?먮━ ?ъ슜 (異⑸룎 ?꾪뿕 媛먯냼)
     self.code ||= SecureRandom.uuid.delete('-')[0..11]
   end
 

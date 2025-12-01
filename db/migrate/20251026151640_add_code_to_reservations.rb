@@ -1,4 +1,4 @@
-class AddCodeToReservations < ActiveRecord::Migration[8.0]
+﻿class AddCodeToReservations < ActiveRecord::Migration[8.0]
   # Temporary model for data migration
   class Reservation < ApplicationRecord
   end

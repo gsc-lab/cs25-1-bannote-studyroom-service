@@ -1,4 +1,4 @@
-require "kafka"
+﻿require "kafka"
 
 kafka = Kafka.new(["localhost:9092"])
 

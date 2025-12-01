@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 require 'room_exception/room_exception_pb'
 require 'room_exception/service_pb'
@@ -20,25 +20,25 @@ module Bannote
           }.freeze
 
           # =========================================
-          # 1) 전체 조회
+          # 1) ?꾩껜 議고쉶
           # =========================================
           def get_room_exceptions(request, _call)
             authorize!("student")
 
             scope = ::RoomException.where(room_id: request.room_id, deleted_at: nil)
 
-            # from_date, to_date 둘 다 있을 경우
+            # from_date, to_date ?????덉쓣 寃쎌슦
             if request.from_date.present? && request.to_date.present?
               start_date = Date.parse(request.from_date)
               end_date = Date.parse(request.to_date)
               scope = scope.where(holiday_date: start_date..end_date)
 
-            # from_date 만 있는 경우
+            # from_date 留??덈뒗 寃쎌슦
             elsif request.from_date.present?
               start_date = Date.parse(request.from_date)
               scope = scope.where("holiday_date >= ?", start_date)
 
-            # to_date 만 있는 경우
+            # to_date 留??덈뒗 寃쎌슦
             elsif request.to_date.present?
               end_date = Date.parse(request.to_date)
               scope = scope.where("holiday_date <= ?", end_date)
@@ -54,7 +54,7 @@ module Bannote
           end
 
           # =========================================
-          # 2) 범위 기반 업데이트
+          # 2) 踰붿쐞 湲곕컲 ?낅뜲?댄듃
           # =========================================
           def update_room_exceptions(request, _call)
             authorize!("assistant")
@@ -66,7 +66,7 @@ module Bannote
             incoming_items = request.exceptions.to_a
             incoming_dates = incoming_items.map(&:holiday_date).map(&:to_s)
 
-            # 범위에 해당하는 기존 데이터 읽기
+            # 踰붿쐞???대떦?섎뒗 湲곗〈 ?곗씠???쎄린
             scope = ::RoomException.where(room_id: room_id, deleted_at: nil)
 
             scope =
@@ -78,12 +78,12 @@ module Bannote
 
             existing = scope.index_by { |ex| ex.holiday_date.to_s }
 
-            # 신규 + 수정 처리
+            # ?좉퇋 + ?섏젙 泥섎━
             ActiveRecord::Base.transaction do
               incoming_items.each do |item|
                 date_str = item.holiday_date.to_s
 
-                # 날짜 검증
+                # ?좎쭨 寃利?
                 validate_holiday_date!(date_str)
 
                 opening = item.opening_time.presence
@@ -113,7 +113,7 @@ module Bannote
               end
 
   
-              # 삭제 처리
+              # ??젣 泥섎━
   
               existing.each do |date_str, record|
                 next if incoming_dates.include?(date_str)
@@ -128,7 +128,7 @@ module Bannote
           end
 
           # =========================================
-          # 유틸 / 검증
+          # ?좏떥 / 寃利?
           # =========================================
           private
 
@@ -172,7 +172,7 @@ module Bannote
             raise_invalid("opening_time must be before closing_time") if start_m >= end_m
           end
 
-          # proto 변환
+          # proto 蹂??
           def room_exception_to_proto(exception)
             RoomException.new(
               id: exception.id,
@@ -187,12 +187,12 @@ module Bannote
             )
           end
 
-          # 에러
+          # ?먮윭
           def raise_invalid(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, msg); end
           def raise_not_found(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, msg); end
           def raise_precondition(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::FAILED_PRECONDITION, msg); end
 
-          # 권한 검사
+          # 沅뚰븳 寃??
           def authorize!(required_role)
             user_role = Current.user_role.to_s
             unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]

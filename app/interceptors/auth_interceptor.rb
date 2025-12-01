@@ -1,8 +1,8 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 require 'grpc'
 require_relative '../../app/models/concerns/current'
-require_relative '../../app/models/concerns/simulated_user_roles'   # 지금은 목데이터 사용
+require_relative '../../app/models/concerns/simulated_user_roles'   # 吏湲덉? 紐⑸뜲?댄꽣 ?ъ슜
 
 class AuthInterceptor < GRPC::ServerInterceptor
   UNAUTHENTICATED = GRPC::BadStatus.new(
@@ -11,12 +11,12 @@ class AuthInterceptor < GRPC::ServerInterceptor
   )
 
   def request_response(request:, call:, method:)
-    # HealthCheck는 인증 제외
+    # HealthCheck???몄쬆 ?쒖쇅
     if method.to_s.match?(/Health|health/i)
       return yield
     end
 
-    # 필수: 유저 코드
+    # ?꾩닔: ?좎? 肄붾뱶
     user_code = call.metadata['x-user-code']
     roles_header = (call.metadata['x-user-role'] || "student").to_s.downcase
 
@@ -24,18 +24,18 @@ class AuthInterceptor < GRPC::ServerInterceptor
       raise UNAUTHENTICATED
     end
 
-    # 권한이 여러 개 들어올 수 있으므로 배열로 변환
+    # 沅뚰븳???щ윭 媛??ㅼ뼱?????덉쑝誘濡?諛곗뿴濡?蹂??
     roles = roles_header.split(',').map(&:strip)
-    # 목데이터 사용으로 아래 코드 사용 유저 서비스 연결 시 주석처리 or 삭제
+    # 紐⑸뜲?댄꽣 ?ъ슜?쇰줈 ?꾨옒 肄붾뱶 ?ъ슜 ?좎? ?쒕퉬???곌껐 ??二쇱꽍泥섎━ or ??젣
     highest_role = roles.max_by { |r| SimulatedUserRoles::AUTHORITY_LEVELS[r] || 0 }
 
-    # 권한이 enum이 들어올 수도 있음 → 숫자로 변환 후 매핑 해야하나?
-    # 유저 서비스 연결시 아래 코드 사용
+    # 沅뚰븳??enum???ㅼ뼱???섎룄 ?덉쓬 ???レ옄濡?蹂????留ㅽ븨 ?댁빞?섎굹?
+    # ?좎? ?쒕퉬???곌껐???꾨옒 肄붾뱶 ?ъ슜
     # roles_enum = roles_header.split(',').map(&:to_i) 
     # roles = roles_enum.map { |v| USER_ROLE_MAP[v] }
     # highest_role = roles.max_by { |r| PRIORITY[r] }
 
-    # 최종 적용
+    # 理쒖쥌 ?곸슜
     Current.user_code = user_code
     Current.user_role = highest_role
 
