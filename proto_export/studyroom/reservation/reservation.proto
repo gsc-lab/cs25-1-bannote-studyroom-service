@@ -29,7 +29,7 @@ enum ReservationStatus {
 // User 정보 (유저 서비스 연동용)
 // ===============================================
 message User {
-  int64 user_code = 1;
+  string user_code = 1;
   string name = 2;
   string department = 3;
 }
@@ -54,8 +54,8 @@ message Reservation {
   google.protobuf.Timestamp updated_at = 10;
   google.protobuf.Timestamp deleted_at = 11;
 
-  repeated int64 user_codes = 12;
-  repeated User users = 13;     // ← 추가됨
+  repeated string user_codes = 12;
+  repeated User users = 13;
 }
 
 // ===============================================
@@ -67,7 +67,7 @@ message CreateReservationRequest {
   string end_time = 3;
   string purpose = 4;
   ReservationPriority priority = 5;
-  repeated int64 user_codes = 6;
+  repeated string user_codes = 6;
 }
 
 message CreateReservationResponse {
@@ -108,7 +108,7 @@ message UpdateReservationRequest {
   string end_time = 4;
   string purpose = 5;
   ReservationPriority priority = 6;
-  repeated int64 user_codes = 7;
+  repeated string user_codes = 7;
 }
 
 message UpdateReservationResponse {
