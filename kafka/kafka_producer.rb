@@ -1,6 +1,6 @@
 ﻿require "kafka"
 
-kafka = Kafka.new(["localhost:9092"])
+kafka = Kafka.new(["localhost:9093"])
 
 topic = "test-topic"
 
