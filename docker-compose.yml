@@ -6,26 +6,14 @@ services:
     working_dir: /rails
     volumes:
       - .:/rails
-
     ports:
       - "9090:9090"
     env_file:
       - .env
       - .env.${RAILS_ENV}
     restart: always
-
-# DB 분리 docker-compose-db.yml로 따로 만들었음
-  # db:
-  #   image: mysql:8.0
-  #   container_name: studyroom_db
-  #   restart: always
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: 1234
-  #     MYSQL_DATABASE: ${DB_NAME:-studyroom_service_development}
-  #   ports:
-  #     - "3307:3306"
-  #   volumes:
-  #     - mysql_data:/var/lib/mysql
+    networks:
+      - ban_note_shared_network
 
   redis:
     image: redis:7
@@ -33,6 +21,8 @@ services:
     restart: always
     ports:
       - "6379:6379"
+    networks:
+      - ban_note_shared_network
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -43,6 +33,8 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    networks:
+      - ban_note_shared_network
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -56,13 +48,15 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: >
+        PLAINTEXT://studyroom_kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - ban_note_shared_network
 
 volumes:
   mysql_data:
 
 networks:
-  default:
+  ban_note_shared_network:
     external: true
-    name: ban_note_shared_network

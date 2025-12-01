@@ -27,6 +27,8 @@ gem "grpc-tools", require: false
 gem "tzinfo-data"
 gem "dotenv-rails"
 
+gem "ruby-kafka"
+
 # ======================================
 # [Development & Test]
 # ======================================
