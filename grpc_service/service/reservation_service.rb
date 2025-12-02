@@ -23,16 +23,13 @@ module Bannote
           # 공통 함수
           # =====================================================================
 
-          # ✔ 수정됨: 타임존 없는 문자열을 KST로 강제 해석
           def parse_datetime(str)
             return nil if str.blank?
 
-            # "2025-11-25T10:30" 처럼 TZ 없는 값 → KST로 강제 변환
             if str =~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
-              return Time.zone.strptime(str, "%Y-%m-%dT%H:%M")
+              return Time.zone.strptime(str, "%Y-%m-%dT:%H:%M")
             end
 
-            # 기존 ISO8601(+09:00, Z 포함) 입력은 그대로 Rails parse
             Time.zone.parse(str)
           end
 
@@ -41,14 +38,12 @@ module Bannote
             Time.new(date.year, date.month, date.day, h, m, 0, "+09:00")
           end
 
-          # HH:mm → minutes (신규 유지)
           def hhmm_to_minutes(hhmm)
             return Float::INFINITY if hhmm.nil? || hhmm.strip == ""
             h, m = hhmm.split(":").map(&:to_i)
             (h * 60) + m
           end
 
-          # 운영시간 체크 (분 단위 비교)
           def within_operating_hours?(start_time, end_time, op)
             start_m = start_time.hour * 60 + start_time.min
             end_m = end_time.hour * 60 + end_time.min
@@ -59,7 +54,6 @@ module Bannote
             start_m >= op_start && end_m <= op_end
           end
 
-          # 예외시간 체크 (기존 유지)
           def conflict_with_exception?(start_time, end_time, ex)
             date = start_time.to_date
             ex_start = combine_date_time(date, ex.opening_time)
@@ -69,21 +63,19 @@ module Bannote
           end
 
           # =====================================================================
-          # UserService 연동 (MOCK)
+          # UserService MOCK
           # =====================================================================
-
           def fetch_users(user_codes)
             return [] if user_codes.blank?
 
             user_codes.map do |code|
               ::Bannote::Studyroomservice::Reservation::V1::User.new(
-                user_code: code,
+                user_code: code.to_s,        # ← 안전하게 to_s
                 name: "MockUser#{code}",
                 department: "MockDept"
               )
             end
           end
-
 
           # =====================================================================
           # 1. 예약 생성
@@ -101,7 +93,6 @@ module Bannote
             raise_not_found("Room") unless room
             raise_precondition("Cannot reserve a deleted room") if room.deleted_at.present?
 
-            # 운영시간 조회
             op = ::RoomOperatingHour.find_by(
               room_id: room.id,
               day_of_week: start_time.wday,
@@ -109,12 +100,10 @@ module Bannote
             )
             raise_precondition("No operating hour defined") unless op
 
-            # 운영시간 체크
             unless within_operating_hours?(start_time, end_time, op)
               raise_precondition("Reservation time is outside operating hours")
             end
 
-            # 최대 운영시간 체크
             max_minutes = hhmm_to_minutes(op.day_maximum_time)
             duration_minutes = ((end_time - start_time) / 60).to_i
 
@@ -124,7 +113,6 @@ module Bannote
               )
             end
 
-            # 예외시간 확인
             exception = ::RoomException.find_by(
               room_id: room.id,
               holiday_date: start_time.to_date,
@@ -138,10 +126,12 @@ module Bannote
               end
             end
 
-            user_codes = request.user_codes.to_a
+            # =====================================================
+            # user_codes 안전하게 string 변환
+            # =====================================================
+            user_codes = request.user_codes.to_a.map(&:to_s)
             raise_invalid("user_codes cannot be empty") if user_codes.empty?
 
-            # 중복 체크
             overlap = ::Reservation
                         .where(room_id: room.id, deleted_at: nil)
                         .where("start_time < ? AND end_time > ?", end_time, start_time)
@@ -155,7 +145,7 @@ module Bannote
               purpose: request.purpose,
               priority: request.priority,
               status: 1,
-              user_codes: user_codes,
+              user_codes: user_codes,               # ← 문자열 배열로 저장
               created_by: Current.user_code
             )
 
@@ -215,7 +205,6 @@ module Bannote
             room = ::Room.find_by(id: request.room_id || reservation.room_id)
             raise_not_found("Room") unless room
 
-            # 운영시간 검사
             op = ::RoomOperatingHour.find_by(
               room_id: room.id,
               day_of_week: start_time.wday,
@@ -227,7 +216,6 @@ module Bannote
               raise_precondition("Outside operating hours")
             end
 
-            # 중복 체크
             overlap = ::Reservation
                         .where(room_id: room.id)
                         .where("start_time < ? AND end_time > ?", end_time, start_time)
@@ -235,7 +223,12 @@ module Bannote
                         .exists?
             raise_precondition("Reservation time overlaps") if overlap
 
-            reservation.user_codes = request.user_codes.to_a if request.user_codes.any?
+            # =====================================================
+            # 수정 시 user_codes도 string 변환 강제
+            # =====================================================
+            if request.user_codes.any?
+              reservation.user_codes = request.user_codes.to_a.map(&:to_s)
+            end
 
             reservation.update!(
               room_id: request.room_id || reservation.room_id,
@@ -276,10 +269,6 @@ module Bannote
             end
           end
 
-          def can_modify?(role)
-            ROLE_PRIORITY[role.to_s] >= ROLE_PRIORITY["assistant"]
-          end
-
           def raise_not_found(msg)
             raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, msg)
           end
@@ -296,9 +285,14 @@ module Bannote
             raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, msg)
           end
 
-          # Reservation → proto 변환 (users 포함)
+          # =====================================================
+          # Reservation → proto 변환
+          # =====================================================
           def reservation_to_proto(res)
-            users = fetch_users(res.user_codes)
+            # 기존 DB에 숫자가 있을 수 있으므로 안전하게 변환
+            safe_user_codes = res.user_codes.to_a.map(&:to_s)
+
+            users = fetch_users(safe_user_codes)
 
             ::Bannote::Studyroomservice::Reservation::V1::Reservation.new(
               id: res.id,
@@ -312,7 +306,7 @@ module Bannote
               created_at: ts(res.created_at),
               updated_at: ts(res.updated_at),
               deleted_at: res.deleted_at ? ts(res.deleted_at) : nil,
-              user_codes: res.user_codes.to_a,
+              user_codes: safe_user_codes,
               users: users
             )
           end
