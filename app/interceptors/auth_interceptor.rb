@@ -2,7 +2,7 @@
 
 require 'grpc'
 require_relative '../../app/models/concerns/current'
-require_relative '../../app/models/concerns/simulated_user_roles'   # 지금은 목데이터 사용
+require_relative '../../app/models/concerns/simulated_user_roles'
 
 class AuthInterceptor < GRPC::ServerInterceptor
   UNAUTHENTICATED = GRPC::BadStatus.new(
@@ -10,36 +10,44 @@ class AuthInterceptor < GRPC::ServerInterceptor
     "Unauthenticated: x-user-code metadata is missing"
   )
 
+  # UserRole enum 뒤 값 → 내부 authorize! 로 쓰는 문자열 매핑
+  ROLE_MAP = {
+    "STUDENT"    => "student",
+    "DOORKEEPER" => "doorkeeper",
+    "CLASS_REP"  => "class_rep",
+    "TA"         => "assistant",
+    "PROFESSOR"  => "professor",
+    "ADMIN"      => "admin",
+    "DEFAULT"    => "student"
+  }.freeze
+
   def request_response(request:, call:, method:)
     # HealthCheck는 인증 제외
     if method.to_s.match?(/Health|health/i)
       return yield
     end
 
-    # 필수: 유저 코드
     user_code = call.metadata['x-user-code']
-    roles_header = (call.metadata['x-user-role'] || "student").to_s.downcase
+    raw_roles = (call.metadata['x-user-role'] || "STUDENT").upcase
 
     if user_code.nil? || user_code.empty?
       raise UNAUTHENTICATED
     end
 
-    # 권한이 여러 개 들어올 수 있으므로 배열로 변환
-    roles = roles_header.split(',').map(&:strip)
-    # 목데이터 사용으로 아래 코드 사용 유저 서비스 연결 시 주석처리 or 삭제
-    highest_role = roles.max_by { |r| SimulatedUserRoles::AUTHORITY_LEVELS[r] || 0 }
+    # 여러 권한이면 쉼표 기반 분리
+    role_keys = raw_roles.split(",").map(&:strip)
 
-    # 권한이 enum이 들어올 수도 있음 → 숫자로 변환 후 매핑 해야하나?
-    # 유저 서비스 연결시 아래 코드 사용
-    # roles_enum = roles_header.split(',').map(&:to_i) 
-    # roles = roles_enum.map { |v| USER_ROLE_MAP[v] }
-    # highest_role = roles.max_by { |r| PRIORITY[r] }
+    # 서버에서 넘어온 enum 뒤 값 → 내부 role 로 매핑
+    mapped_roles = role_keys.map { |key| ROLE_MAP[key] || "student" }
 
-    # 최종 적용
+    # SimulatedUserRoles 로 가장 높은 권한 찾기
+    highest_role = mapped_roles.max_by { |r| SimulatedUserRoles::AUTHORITY_LEVELS[r] || 0 }
+
+    # Current에 저장
     Current.user_code = user_code
     Current.user_role = highest_role
 
-    puts "[Auth] user_code=#{user_code}, roles=#{roles}, highest_role=#{highest_role}"
+    puts "[Auth] user_code=#{user_code}, raw_roles=#{role_keys}, mapped_roles=#{mapped_roles}, highest_role=#{highest_role}"
 
     yield
 
