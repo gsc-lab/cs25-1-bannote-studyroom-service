@@ -4,18 +4,18 @@
 require 'grpc'
 
 # =====================================================
-# 1. Rails 
+# 1. Rails 환경 로딩
 # =====================================================
 require_relative '../config/environment'
 
 # =====================================================
-# 2. gRPC 
+# 2. gRPC 관련 경로 로딩
 # =====================================================
 $LOAD_PATH.unshift(File.expand_path('../app/grpc', __dir__))
 $LOAD_PATH.unshift(File.expand_path('../app', __dir__))
 
 # =====================================================
-# 3. Proto 
+# 3. Proto 파일 로딩
 # =====================================================
 require 'room/room_pb'
 require 'room/service_pb'
@@ -36,16 +36,22 @@ require 'room_exception/service_services_pb'
 require 'healthcheck/healthcheck_pb'
 require 'healthcheck/healthcheck_services_pb'
 
+# =====================================================
+# 4. Service Handler 로딩
+# =====================================================
 require_relative 'service/room_service'
 require_relative 'service/reservation_service'
 require_relative 'service/room_operating_hour_service'
 require_relative 'service/room_exception_service'
 require_relative 'service/healthcheck_service'
 
+# =====================================================
+# 5. Interceptor 로딩
+# =====================================================
 require_relative '../app/interceptors/auth_interceptor'
 
 # =====================================================
-# 6. gRPC 
+# 6. gRPC 서버 시작
 # =====================================================
 module Bannote
   module Studyroomservice
@@ -58,9 +64,11 @@ module Bannote
         puts "[gRPC] Using database host: #{ENV.fetch('DB_HOST', '(not set)')}"
 
         interceptors = [AuthInterceptor.new]
+
         server = GRPC::RpcServer.new(interceptors: interceptors)
         server.add_http2_port("0.0.0.0:#{grpc_port}", :this_port_is_insecure)
 
+        # 서비스 핸들러 등록
         server.handle(Bannote::Studyroomservice::Room::V1::RoomServiceHandler.new)
         server.handle(Bannote::Studyroomservice::Reservation::V1::ReservationServiceHandler.new)
         server.handle(Bannote::Studyroomservice::Roomoperatinghour::V1::RoomOperatingHourServiceHandler.new)
@@ -71,7 +79,6 @@ module Bannote
         puts "[gRPC] Waiting for incoming requests..."
 
         server.run_till_terminated_or_interrupted(['INT', 'TERM'])
-        puts "[gRPC] Server stopped cleanly."
       rescue => e
         STDERR.puts "[gRPC] Fatal error: #{e.class} - #{e.message}"
         STDERR.puts e.backtrace.join("\n")

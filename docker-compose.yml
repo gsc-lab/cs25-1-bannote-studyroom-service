@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   app:
     build: .
@@ -24,6 +26,7 @@ services:
     networks:
       - ban_note_shared_network
 
+  # ZOOKEEPER (Kafka 3.x에서는 필수)
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: studyroom_zookeeper
@@ -36,6 +39,7 @@ services:
     networks:
       - ban_note_shared_network
 
+  # KAFKA BROKER (Karafka 2.5와 가장 안정적인 조합)
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: studyroom_kafka
@@ -43,22 +47,29 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9093:9093"
+      - "9093:9093"   # 외부 접속 포트
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+
+      # 리스너 설정
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9093
+
+      # Docker 내부에서는 INTERNAL 접속
+      # 개발 PC에서는 EXTERNAL 접속(=localhost:9093)
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9093
+
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     networks:
       - ban_note_shared_network
 
-  kafka-consumer:
+  # KARAFKA SERVER (Consumer)
+  karafka-server:
     build: .
-    container_name: studyroom_kafka_consumer
-    command: ["ruby", "kafka/user_service_consumer.rb"]
+    container_name: studyroom_karafka_server
+    command: ["bundle", "exec", "karafka", "server"]
     working_dir: /rails
     volumes:
       - .:/rails
@@ -67,7 +78,6 @@ services:
       - .env.${RAILS_ENV}
     restart: always
     depends_on:
-      - app
       - kafka
     networks:
       - ban_note_shared_network

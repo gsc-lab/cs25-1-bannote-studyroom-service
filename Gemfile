@@ -1,6 +1,6 @@
 source "https://rubygems.org"
 
-gem 'ruby-kafka'
+gem "karafka", "~> 2.5"
 
 # ======================================
 # [Core Framework]
@@ -26,8 +26,6 @@ gem "grpc-tools", require: false
 # ======================================
 gem "tzinfo-data"
 gem "dotenv-rails"
-
-gem "ruby-kafka"
 
 # ======================================
 # [Development & Test]
