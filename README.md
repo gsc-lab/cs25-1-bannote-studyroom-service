@@ -1,4 +1,4 @@
-# 📚 Studyroom Service
+# Studyroom Service
 > 그룹 기반 스터디룸 예약 관리 백엔드 서비스
 
 ---
