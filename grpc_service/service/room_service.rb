@@ -23,7 +23,7 @@ module Bannote
           }.freeze
 
           # =========================================
-          # 1. 諛??앹꽦
+          # 1. 방 생성
           # =========================================
           def create_room(request, _call)
             authorize!("assistant")
@@ -58,7 +58,7 @@ module Bannote
           end
 
           # =========================================
-          # 2. 諛??⑥씪 議고쉶
+          # 2. 방 단건 조회
           # =========================================
           def get_room(request, _call)
             authorize!("student")
@@ -73,7 +73,7 @@ module Bannote
           end
 
           # =========================================
-          # 3. 諛?紐⑸줉 議고쉶 (?섏씠吏?ㅼ씠??
+          # 3. 방 목록 조회 (페이지네이션)
           # =========================================
           def list_rooms(request, _call)
             authorize!("assistant")
@@ -101,7 +101,7 @@ module Bannote
           end
 
           # =========================================
-          # 4. 諛??섏젙
+          # 4. 방 수정
           # =========================================
           def update_room(request, _call)
             authorize!("assistant")
@@ -128,7 +128,7 @@ module Bannote
           end
 
           # =========================================
-          # 5. 諛???젣 (Soft Delete)
+          # 5. 방 삭제 (Soft Delete)
           # =========================================
           def delete_room(request, _call)
             authorize!("assistant")
@@ -143,7 +143,7 @@ module Bannote
           end
 
           # =========================================
-          # 怨듯넻 硫붿꽌??
+          # 공통 메서드
           # =========================================
           private
 
@@ -184,7 +184,7 @@ module Bannote
             )
           end
 
-          # Room ??Proto 蹂??
+          # Room -> Proto 변환
           def room_to_proto(room)
             Bannote::Studyroomservice::Room::V1::Room.new(
               id: room.id,

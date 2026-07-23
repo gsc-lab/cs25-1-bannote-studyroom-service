@@ -1,27 +1,27 @@
 ﻿Rails.application.routes.draw do
   # ======================================
-  # Healthcheck endpoints (荑좊쾭?ㅽ떚???ъ뒪泥댄겕??
+  # Healthcheck endpoints (쿠버네티스 헬스체크용)
   # ======================================
   get "/app-health/studyroom-service/livez", to: ->(_) { [200, { "Content-Type" => "text/plain" }, ["ok"]] }
   get "/app-health/studyroom-service/readyz", to: ->(_) { [200, { "Content-Type" => "text/plain" }, ["ok"]] }
 
   # ======================================
-  # 湲곕낯 ?쇱슦??
+  # 기본 라우팅
   # ======================================
   root to: ->(env) { [200, { "Content-Type" => "text/plain" }, ["Hello from Rails"]] }
 
   # ======================================
-  # 湲곕뒫蹂?API ?쇱슦??
+  # 기능별 API 라우팅
   # ======================================
-  # 諛?愿??
+  # 방 관련
   resources :rooms
 
-  # ?덉빟 愿??
+  # 예약 관련
   resources :reservations
 
-  # ?댁쁺 ?쒓컙 愿??
+  # 운영 시간 관련
   resources :room_operating_hours
 
-  # ?덉쇅(?댁씪, ?먭? ?? 愿??
+  # 예외(휴일, 특강 등) 관련
   resources :room_exceptions
 end

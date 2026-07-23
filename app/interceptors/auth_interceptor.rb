@@ -22,7 +22,7 @@ class AuthInterceptor < GRPC::ServerInterceptor
   }.freeze
 
   def request_response(request:, call:, method:)
-    # HealthCheck???몄쬆 ?쒖쇅
+    # HealthCheck는 인증 제외
     if method.to_s.match?(/Health|health/i)
       return yield
     end

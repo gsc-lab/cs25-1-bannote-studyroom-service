@@ -6,6 +6,6 @@ module Current
 
   def self.reset
     self.user_code = nil
-    self.user_role = "student" # 湲곕낯 沅뚰븳
+    self.user_role = "student" # 기본 권한
   end
 end

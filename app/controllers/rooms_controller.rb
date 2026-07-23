@@ -1,10 +1,10 @@
 ﻿class RoomsController < ApplicationController
-  # ?꾩껜 議고쉶
+  # 전체 조회
   def index
     render json: Room.all
   end
 
-  # ?④굔 議고쉶
+  # 단건 조회
   def show
     room = Room.find(params[:id])
     render json: room
@@ -12,7 +12,7 @@
     render json: { error: 'Room not found' }, status: :not_found
   end
 
-  # ?앹꽦
+  # 생성
   def create
     room = Room.new(room_params)
     if room.save
@@ -22,7 +22,7 @@
     end
   end
 
-  # ?섏젙
+  # 수정
   def update
     room = Room.find(params[:id])
     if room.update(room_params)
@@ -32,7 +32,7 @@
     end
   end
 
-  # ??젣
+  # 삭제
   def destroy
     room = Room.find(params[:id])
     room.destroy

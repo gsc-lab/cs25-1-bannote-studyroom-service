@@ -16,7 +16,7 @@ module Grpc
         end
 
         def watch(request, _call)
-          # Health streaming? 蹂댄넻 ???곗씠誘濡?NotImplemented 泥섎━
+          # Health streaming은 보통 사용하지 않으므로 NotImplemented 처리
           raise GRPC::BadStatus.new_status_exception(
             GRPC::Core::StatusCodes::UNIMPLEMENTED,
             'Watch not implemented'

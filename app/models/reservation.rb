@@ -4,13 +4,13 @@ class Reservation < ApplicationRecord
   belongs_to :room
 
   # ========================================
-  # Callbacks
+  # 콜백
   # ========================================
   before_validation :set_defaults
   before_validation :generate_code, on: :create
 
   # ========================================
-  # Validations
+  # 유효성 검증
   # ========================================
   validates :code, presence: true, uniqueness: true
   validates :purpose, presence: true
@@ -20,16 +20,16 @@ class Reservation < ApplicationRecord
 
   validate :start_time_before_end_time
 
-  # group_id?????댁긽 ?ъ슜?섏? ?딆쑝誘濡?validation ?쒓굅
-  # user_id???쒓굅????user_codes(JSON)濡??泥대맖
+  # group_id는 더 이상 사용하지 않으므로 validation 제거
+  # user_id는 제거되고 user_codes(JSON)로 대체됨
 
   # ========================================
-  # Default scope (Soft delete)
+  # 기본 스코프 (Soft delete)
   # ========================================
   default_scope { where(deleted_at: nil) }
 
   # ========================================
-  # Soft delete method
+  # Soft delete 메서드
   # ========================================
   def soft_delete(deleted_by: nil)
     update(
@@ -45,26 +45,26 @@ class Reservation < ApplicationRecord
   private
 
   # ========================================
-  # Default values
+  # 기본값
   # ========================================
   def set_defaults
     self.priority ||= 0
 
-    # 留ㅼ슦 以묒슂: MySQL JSON 而щ읆? 湲곕낯媛믪쓣 DB?먯꽌??以????녾린 ?뚮Ц??
-    # Rails?먯꽌 湲곕낯媛믪쓣 媛뺤젣濡?二쇱뼱????
+    # 매우 중요: MySQL JSON 컬럼은 기본값을 DB에서는 줄 수 없기 때문에
+    # Rails에서 기본값을 강제로 주어야 함
     self.user_codes ||= []
   end
 
   # ========================================
-  # Auto-generate code BEFORE validation
+  # 유효성 검증 전 code 자동 생성
   # ========================================
   def generate_code
-    # UUID ??12?먮━ ?ъ슜 (異⑸룎 ?꾪뿕 媛먯냼)
+    # UUID 앞 12자리 사용 (충돌 위험 감소)
     self.code ||= SecureRandom.uuid.delete('-')[0..11]
   end
 
   # ========================================
-  # Time validation
+  # 시간 검증
   # ========================================
   def start_time_before_end_time
     return unless start_time && end_time

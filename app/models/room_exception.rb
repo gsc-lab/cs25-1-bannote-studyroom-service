@@ -3,17 +3,17 @@
 
   after_save :cancel_conflicting_reservations
 
-  # 湲곕낯 ?좏슚??寃??
+  # 기본 유효성 검증
   validates :room_id, presence: true
   validates :holiday_date, presence: true
   validates :created_by, presence: true
 
-  # 異붽? ?좏슚??寃??
+  # 추가 유효성 검증
   validate :validate_time_rule
   validate :validate_time_order
   validate :validate_duplicate_date
 
-  # Soft Delete
+  # Soft delete 처리
   default_scope { where(deleted_at: nil) }
 
   def soft_delete
@@ -27,7 +27,7 @@
   private
 
   # ----------------------------------------
-  # 1) ?꾩껜 ?댁씪 vs 遺遺??댁씪 洹쒖튃
+  # 1) 전체 휴일 vs 부분 휴일 규칙
   # ----------------------------------------
   def validate_time_rule
     return if opening_time.nil? && closing_time.nil?
@@ -38,7 +38,7 @@
   end
 
   # ----------------------------------------
-  # 2) ?쒓컙 ?쒖꽌 寃利?(Time.parse ?곸슜)
+  # 2) 시간 순서 검증 (Time.parse 적용)
   # ----------------------------------------
   def validate_time_order
     return if opening_time.blank? || closing_time.blank?
@@ -54,7 +54,7 @@
   end
 
   # ----------------------------------------
-  # 3) ?숈씪 ?좎쭨 以묐났 諛⑹?
+  # 3) 동일 날짜 중복 방지
   # ----------------------------------------
   def validate_duplicate_date
     return if room_id.blank? || holiday_date.blank?
@@ -70,7 +70,7 @@
   end
 
   # ----------------------------------------
-  # 湲곗〈 ?덉빟 ?먮룞 痍⑥냼 濡쒖쭅 (?쒓컙 鍮꾧탳 媛쒖꽑)
+  # 기존 예약 자동 취소 로직 (시간 비교 개선)
   # ----------------------------------------
   def cancel_conflicting_reservations
     reservations_on_date = Reservation.where(
@@ -78,13 +78,13 @@
       start_time: holiday_date.all_day
     )
 
-    # Case 1: ?꾩쟾 ?대Т????紐⑤몢 ??젣
+    # Case 1: 전체 휴무일이면 모두 삭제
     if opening_time.nil? && closing_time.nil?
       reservations_on_date.find_each { |reservation| reservation.soft_delete(deleted_by: 0) }
       return
     end
 
-    # Case 2: 遺遺??대Т??
+    # Case 2: 부분 휴무일
     if opening_time.present? && closing_time.present?
       begin
         ex_start = Time.parse(opening_time)
@@ -97,7 +97,7 @@
         r_start = reservation.start_time
         r_end   = reservation.end_time
 
-        # ?덉쇅 ?쒓컙 ?몄뿉 嫄몄튂硫???젣
+        # 예외 시간 안에 걸치면 삭제
         unless (r_start >= ex_start && r_end <= ex_end)
           reservation.soft_delete(deleted_by: 0)
         end

@@ -1,7 +1,7 @@
 ﻿class RoomOperatingHour < ApplicationRecord
   belongs_to :room
 
-  # 湲곕낯 ?좏슚??寃??
+  # 기본 유효성 검증
   validates :room_id, presence: true
   validates :day_of_week, presence: true, numericality: { only_integer: true, in: 0..6 }
   validates :opening_time, presence: true
@@ -10,7 +10,7 @@
   validate :validate_time_order
   validate :validate_day_of_week_duplication
 
-  # Soft Delete
+  # Soft delete 처리
   default_scope { where(deleted_at: nil) }
 
   def soft_delete
@@ -24,7 +24,7 @@
   private
 
   # ----------------------------------------
-  # opening_time < closing_time 寃利?
+  # opening_time < closing_time 검증
   # ----------------------------------------
   def validate_time_order
     return if opening_time.blank? || closing_time.blank?
@@ -40,7 +40,7 @@
   end
 
   # ----------------------------------------
-  # ?숈씪 room_id + day_of_week 以묐났 湲덉?
+  # 동일 room_id + day_of_week 중복 금지
   # ----------------------------------------
   def validate_day_of_week_duplication
     return if room_id.blank? || day_of_week.blank?

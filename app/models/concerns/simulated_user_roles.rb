@@ -1,7 +1,7 @@
 ﻿# frozen_string_literal: true
 
 module SimulatedUserRoles
-  # Define authority levels
+  # 권한 레벨 정의
   AUTHORITY_LEVELS = {
     "student" => 10,
     "doorkeeper" => 20,

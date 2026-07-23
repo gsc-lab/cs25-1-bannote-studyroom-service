@@ -44,13 +44,13 @@ Rails.application.configure do
   config.active_support.report_deprecations = false
 
   # =====================================
-  # [Cache / Job queue ?ㅼ젙]
+  # [Cache / Job queue 설정]
   # =====================================
 
-  # 罹먯떆 ?ㅽ넗?대? memory_store 濡?蹂寃?
+  # 캐시 스토어를 memory_store 로 변경
   config.cache_store = :memory_store
 
-  # solid_queue 愿???ㅼ젙 ?꾩쟾 ?쒓굅
+  # solid_queue 관련 설정 전체 제거
   # config.active_job.queue_adapter = :solid_queue
   # config.solid_queue.connects_to = { database: { writing: :queue } }
 
@@ -90,7 +90,7 @@ Rails.application.configure do
   # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 
   # ================================
-  # [gRPC 愿???뚯씪 autoload ?쒖쇅 ?ㅼ젙]
+  # [gRPC 관련 파일 autoload 제외 설정]
   # ================================
   config.autoload_paths -= Dir["#{Rails.root}/app/grpc/**"]
   config.eager_load_paths -= Dir["#{Rails.root}/app/grpc/**"]

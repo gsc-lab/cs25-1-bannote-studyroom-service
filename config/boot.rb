@@ -3,6 +3,6 @@
 require "bundler/setup"
 require "bootsnap/setup"
 
-# gRPC ?대뜑 autoload 諛⑹?
+# gRPC 폴더는 autoload 대상에서 제외
 grpc_path = File.expand_path("../app/grpc", __dir__)
 $LOAD_PATH.delete(grpc_path) if $LOAD_PATH.include?(grpc_path)
