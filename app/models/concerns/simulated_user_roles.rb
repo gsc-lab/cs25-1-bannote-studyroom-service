@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 module SimulatedUserRoles
   # Define authority levels
@@ -6,8 +6,8 @@ module SimulatedUserRoles
     "student" => 10,
     "doorkeeper" => 20,
     "class_rep" => 30,
-    "assistant" => 50, # 조교
-    "professor" => 70, # 교수
+    "assistant" => 50, # 議곌탳
+    "professor" => 70, # 援먯닔
     "admin" => 100
   }.freeze
 

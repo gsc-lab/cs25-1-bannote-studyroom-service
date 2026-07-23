@@ -1,53 +1,79 @@
+version: "3.9"
+
 services:
+  # =====================================================
+  # 1) Ruby gRPC + Rails Application
+  # =====================================================
   app:
     build: .
     container_name: studyroom_app
-    command: bash -c "rm -f tmp/pids/server.pid && ruby grpc_service/server.rb"
+    command: ["ruby", "grpc_service/server.rb"]
     working_dir: /rails
     volumes:
       - .:/rails
-
     ports:
-      - "9090:9090"
+      - "9090:9090"    # gRPC 포트
     env_file:
       - .env
       - .env.${RAILS_ENV}
     restart: always
+    depends_on:
+      - db
+      - redis
+      - kafka
+    networks:
+      - ban_note_shared_network
 
-# DB 분리 docker-compose-db.yml로 따로 만들었음
-  # db:
-  #   image: mysql:8.0
-  #   container_name: studyroom_db
-  #   restart: always
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: 1234
-  #     MYSQL_DATABASE: ${DB_NAME:-studyroom_service_development}
-  #   ports:
-  #     - "3307:3306"
-  #   volumes:
-  #     - mysql_data:/var/lib/mysql
+  # =====================================================
+  # 2) MySQL Database
+  # =====================================================
+  db:
+    image: mysql:8
+    container_name: studyroom_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: studyroom
+      TZ: Asia/Seoul
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: always
+    networks:
+      - ban_note_shared_network
 
+  # =====================================================
+  # 3) Redis
+  # =====================================================
   redis:
     image: redis:7
     container_name: studyroom_redis
     restart: always
     ports:
       - "6379:6379"
+    networks:
+      - ban_note_shared_network
 
+  # =====================================================
+  # 4) Zookeeper (Kafka 의존)
+  # =====================================================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: studyroom_zookeeper
-    restart: always
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      TZ: Asia/Seoul
     ports:
       - "2181:2181"
+    networks:
+      - ban_note_shared_network
 
+  # =====================================================
+  # 5) Kafka Broker
+  # =====================================================
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: studyroom_kafka
-    restart: always
     depends_on:
       - zookeeper
     ports:
@@ -55,14 +81,18 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      TZ: Asia/Seoul
+    networks:
+      - ban_note_shared_network
+
+# =====================================================
+# Networks & Volumes
+# =====================================================
+networks:
+  ban_note_shared_network:
 
 volumes:
   mysql_data:
-
-networks:
-  default:
-    external: true
-    name: ban_note_shared_network

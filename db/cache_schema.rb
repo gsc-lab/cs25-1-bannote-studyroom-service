@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 ActiveRecord::Schema[7.2].define(version: 1) do
   create_table "solid_cache_entries", force: :cascade do |t|

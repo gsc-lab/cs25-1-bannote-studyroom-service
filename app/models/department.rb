@@ -1,3 +1,3 @@
-class Department < ApplicationRecord
+﻿class Department < ApplicationRecord
   has_many :rooms
 end

@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 module Bannote
   module Studyroomservice
@@ -14,7 +14,7 @@ module Bannote
           }.freeze
 
           # =========================================
-          # 1) 전체 조회 (GetRoomOperatingHours)
+          # 1) ?꾩껜 議고쉶 (GetRoomOperatingHours)
           # =========================================
           def get_room_operating_hours(request, _call)
             authorize!("student")
@@ -34,7 +34,7 @@ module Bannote
 
 
           # =========================================
-          # 2) 리스트 기반 전체 업데이트 (UpdateRoomOperatingHours)
+          # 2) 由ъ뒪??湲곕컲 ?꾩껜 ?낅뜲?댄듃 (UpdateRoomOperatingHours)
           # =========================================
           def update_room_operating_hours(request, _call)
             authorize!("assistant")
@@ -42,7 +42,7 @@ module Bannote
             room_id = request.room_id
             new_items = request.operating_hours.to_a
 
-            # ===== 리스트 내부 중복 방지 =====
+            # ===== 由ъ뒪???대? 以묐났 諛⑹? =====
             day_list = new_items.map(&:day_of_week)
             if day_list.size != day_list.uniq.size
               raise_invalid("Duplicate day_of_week exists in request list")
@@ -82,7 +82,7 @@ module Bannote
                 end
               end
 
-              # B. delete (요청에서 빠진 요일)
+              # B. delete (?붿껌?먯꽌 鍮좎쭊 ?붿씪)
               existing.each do |dow, record|
                 unless incoming_days.include?(dow)
                   record.update!(deleted_at: Time.current)
@@ -95,7 +95,7 @@ module Bannote
 
 
           # =========================================
-          # 유틸 & 검증
+          # ?좏떥 & 寃利?
           # =========================================
           private
 
@@ -138,7 +138,7 @@ module Bannote
             raise_invalid("opening_time must be before closing_time") if start_m >= end_m
           end
 
-          # proto 변환
+          # proto 蹂??
           def room_operating_hour_to_proto(h)
             RoomOperatingHour.new(
               id: h.id,
@@ -161,12 +161,12 @@ module Bannote
             )
           end
 
-          # 에러 유틸
+          # ?먮윭 ?좏떥
           def raise_not_found(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, msg); end
           def raise_invalid(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, msg); end
           def raise_precondition(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::FAILED_PRECONDITION, msg); end
 
-          # 권한 체크
+          # 沅뚰븳 泥댄겕
           def authorize!(required_role)
             user_role = Current.user_role.to_s
             unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]

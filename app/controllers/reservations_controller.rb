@@ -1,4 +1,4 @@
-class ReservationsController < ApplicationController
+﻿class ReservationsController < ApplicationController
   def index
     reservations = Reservation.all
     render json: reservations

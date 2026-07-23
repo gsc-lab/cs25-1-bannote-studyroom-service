@@ -1,6 +1,6 @@
 source "https://rubygems.org"
 
-gem 'ruby-kafka'
+gem "karafka", "~> 2.5"
 
 # ======================================
 # [Core Framework]

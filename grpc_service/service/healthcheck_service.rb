@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 require 'grpc'
 require 'healthcheck/healthcheck_pb'
@@ -16,7 +16,7 @@ module Grpc
         end
 
         def watch(request, _call)
-          # Health streaming은 보통 안 쓰이므로 NotImplemented 처리
+          # Health streaming? 蹂댄넻 ???곗씠誘濡?NotImplemented 泥섎━
           raise GRPC::BadStatus.new_status_exception(
             GRPC::Core::StatusCodes::UNIMPLEMENTED,
             'Watch not implemented'

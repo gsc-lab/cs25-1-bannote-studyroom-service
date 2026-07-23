@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 require 'grpc'
 require_relative '../../app/models/concerns/current'
@@ -22,7 +22,7 @@ class AuthInterceptor < GRPC::ServerInterceptor
   }.freeze
 
   def request_response(request:, call:, method:)
-    # HealthCheck는 인증 제외
+    # HealthCheck???몄쬆 ?쒖쇅
     if method.to_s.match?(/Health|health/i)
       return yield
     end

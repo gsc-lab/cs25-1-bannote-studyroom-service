@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+﻿# frozen_string_literal: true
 
 require 'room/room_pb'
 require 'room/service_pb'
@@ -23,7 +23,7 @@ module Bannote
           }.freeze
 
           # =========================================
-          # 1. 방 생성
+          # 1. 諛??앹꽦
           # =========================================
           def create_room(request, _call)
             authorize!("assistant")
@@ -52,7 +52,7 @@ module Bannote
           end
 
           # =========================================
-          # 2. 방 단일 조회
+          # 2. 諛??⑥씪 議고쉶
           # =========================================
           def get_room(request, _call)
             authorize!("student")
@@ -67,7 +67,7 @@ module Bannote
           end
 
           # =========================================
-          # 3. 방 목록 조회 (페이지네이션)
+          # 3. 諛?紐⑸줉 議고쉶 (?섏씠吏?ㅼ씠??
           # =========================================
           def list_rooms(request, _call)
             authorize!("assistant")
@@ -95,7 +95,7 @@ module Bannote
           end
 
           # =========================================
-          # 4. 방 수정
+          # 4. 諛??섏젙
           # =========================================
           def update_room(request, _call)
             authorize!("assistant")
@@ -122,7 +122,7 @@ module Bannote
           end
 
           # =========================================
-          # 5. 방 삭제 (Soft Delete)
+          # 5. 諛???젣 (Soft Delete)
           # =========================================
           def delete_room(request, _call)
             authorize!("assistant")
@@ -137,7 +137,7 @@ module Bannote
           end
 
           # =========================================
-          # 공통 메서드
+          # 怨듯넻 硫붿꽌??
           # =========================================
           private
 
@@ -178,7 +178,7 @@ module Bannote
             )
           end
 
-          # Room → Proto 변환
+          # Room ??Proto 蹂??
           def room_to_proto(room)
             Bannote::Studyroomservice::Room::V1::Room.new(
               id: room.id,

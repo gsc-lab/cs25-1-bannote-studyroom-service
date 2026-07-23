@@ -1,9 +1,45 @@
 # See https://git-scm.com/docs/gitattributes for more about git attribute files.
 
-# Mark the database schema as having been generated.
+# ===========================
+# GitHub linguist settings
+# ===========================
 db/schema.rb linguist-generated
-
-# Mark any vendored files as having been vendored.
 vendor/* linguist-vendored
+
 config/credentials/*.yml.enc diff=rails_credentials
-config/credentials.yml.enc diff=rails_credentials
+config/credentials.yml.enc  diff=rails_credentials
+
+# ===========================
+# Enforce LF line endings
+# ===========================
+* text=auto eol=lf
+
+# Ruby / Rails files
+*.rb     text eol=lf
+*.rake   text eol=lf
+*.ru     text eol=lf
+
+# Shell scripts
+*.sh     text eol=lf
+
+# Configuration files
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.env    text eol=lf
+
+# Protobuf files
+*.proto  text eol=lf
+
+# Scripts & binaries
+*.js     text eol=lf
+*.json   text eol=lf
+
+# Docker-related
+Dockerfile text eol=lf
+
+# Ignore binary files
+*.png    -text
+*.jpg    -text
+*.jpeg   -text
+*.gif    -text
+*.pdf    -text
