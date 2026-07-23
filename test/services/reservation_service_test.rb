@@ -1,37 +1,48 @@
-﻿require 'test_helper'
-require 'google/protobuf/timestamp_pb'
+require "test_helper"
+
+# grpc_service/service/*.rb 는 app/grpc 를 자체 $LOAD_PATH 에 추가한 뒤
+# bare require("reservation/...")로 proto 파일을 불러오므로, 여기서도
+# 동일하게 로드 경로를 맞춰준 뒤 핸들러 파일을 직접 require 한다.
+grpc_lib_path = Rails.root.join("app/grpc").to_s
+$LOAD_PATH.unshift(grpc_lib_path) unless $LOAD_PATH.include?(grpc_lib_path)
+require_relative "../../grpc_service/service/reservation_service"
 
 class ReservationServiceTest < ActiveSupport::TestCase
-  def setup
-    @service = ReservationService.new
-    @room = Room.create!(name: 'Test Room', department_id: 1, status: :active)
+  Handler = Bannote::Studyroomservice::Reservation::V1::ReservationServiceHandler
+  RequestMessage = Bannote::Studyroomservice::Reservation::V1::CreateReservationRequest
 
-    # ?댁쁺 ?쒓컙: ?붿슂??09:00-18:00
+  setup do
+    Current.user_code = "test_admin"
+    Current.user_role = "admin"
+
+    @service = Handler.new
+    @room = Room.create!(name: "Test Room #{SecureRandom.hex(4)}", maximum_member: 4)
+
+    # 운영 시간: 월요일 09:00-18:00
     @operating_day = Date.today.next_occurring(:monday)
     RoomOperatingHour.create!(
       room: @room,
-      day_of_week: @operating_day.wday, # Monday
-      opening_time: '09:00',
-      closing_time: '18:00'
+      day_of_week: @operating_day.wday,
+      opening_time: "09:00",
+      closing_time: "18:00"
     )
 
-    # ?덉쇅/?댁씪: ?붿슂??
+    # 휴일: 화요일
     @holiday_date = Date.today.next_occurring(:tuesday)
     RoomException.create!(
       room: @room,
       holiday_date: @holiday_date,
-      reason: 'Maintenance',
+      reason: "Maintenance",
       created_by: 1
     )
 
-    # 湲곗〈 ?덉빟: ?섏슂??10:00-11:00
+    # 기존 예약: 수요일 10:00-11:00
     @booked_day = Date.today.next_occurring(:wednesday)
-    # ?섏슂???댁쁺 ?쒓컙??異붽?
     RoomOperatingHour.create!(
       room: @room,
-      day_of_week: @booked_day.wday, # Wednesday
-      opening_time: '09:00',
-      closing_time: '18:00'
+      day_of_week: @booked_day.wday,
+      opening_time: "09:00",
+      closing_time: "18:00"
     )
     @existing_start = @booked_day.to_time.change(hour: 10)
     @existing_end = @booked_day.to_time.change(hour: 11)
@@ -39,45 +50,45 @@ class ReservationServiceTest < ActiveSupport::TestCase
       room: @room,
       start_time: @existing_start,
       end_time: @existing_end,
-      group_id: 1, purpose: 'Existing Meeting', priority: 1, created_by: 1
+      purpose: "Existing Meeting",
+      priority: 1,
+      user_codes: [ "existing_user" ]
     )
   end
 
-  # ?깃났 耳?댁뒪
+  teardown do
+    Current.reset
+  end
+
   test "should create reservation on a valid time slot" do
-    # ?붿슂??14:00 - 15:00 ?덉빟 ?쒕룄
     start_time = @operating_day.to_time.change(hour: 14)
     end_time = @operating_day.to_time.change(hour: 15)
 
-    request = Studyroom::CreateReservationRequest.new(
+    request = RequestMessage.new(
       room_id: @room.id,
-      group_id: 2,
-      start_time: Google::Protobuf::Timestamp.new(seconds: start_time.to_i),
-      end_time: Google::Protobuf::Timestamp.new(seconds: end_time.to_i),
-      purpose: 'New Meeting',
+      start_time: start_time.iso8601,
+      end_time: end_time.iso8601,
+      purpose: "New Meeting",
       priority: 1,
-      created_by: 1
+      user_codes: [ "new_user" ]
     )
 
-    assert_difference('Reservation.count', 1) do
+    assert_difference("Reservation.count", 1) do
       @service.create_reservation(request, nil)
     end
   end
 
-  # ?ㅽ뙣 耳?댁뒪: ?댁쁺 ?쒓컙 ??
   test "should raise error when booking outside operating hours" do
-    # ?붿슂??08:00 - 09:00 ?덉빟 ?쒕룄 (?댁쁺 ?쒖옉 ??
     start_time = @operating_day.to_time.change(hour: 8)
     end_time = @operating_day.to_time.change(hour: 9)
 
-    request = Studyroom::CreateReservationRequest.new(
+    request = RequestMessage.new(
       room_id: @room.id,
-      group_id: 2,
-      start_time: Google::Protobuf::Timestamp.new(seconds: start_time.to_i),
-      end_time: Google::Protobuf::Timestamp.new(seconds: end_time.to_i),
-      purpose: 'Early Meeting',
+      start_time: start_time.iso8601,
+      end_time: end_time.iso8601,
+      purpose: "Early Meeting",
       priority: 1,
-      created_by: 1
+      user_codes: [ "new_user" ]
     )
 
     error = assert_raises(GRPC::BadStatus) do
@@ -85,23 +96,20 @@ class ReservationServiceTest < ActiveSupport::TestCase
     end
 
     assert_equal GRPC::Core::StatusCodes::FAILED_PRECONDITION, error.code
-    assert_match /outside of the room's standard operating hours/, error.details
+    assert_match(/outside operating hours/, error.details)
   end
 
-  # ?ㅽ뙣 耳?댁뒪: ?댁씪
   test "should raise error when booking on a holiday" do
-    # ?붿슂??(?댁씪) 10:00 - 11:00 ?덉빟 ?쒕룄
     start_time = @holiday_date.to_time.change(hour: 10)
     end_time = @holiday_date.to_time.change(hour: 11)
 
-    request = Studyroom::CreateReservationRequest.new(
+    request = RequestMessage.new(
       room_id: @room.id,
-      group_id: 2,
-      start_time: Google::Protobuf::Timestamp.new(seconds: start_time.to_i),
-      end_time: Google::Protobuf::Timestamp.new(seconds: end_time.to_i),
-      purpose: 'Holiday Meeting',
+      start_time: start_time.iso8601,
+      end_time: end_time.iso8601,
+      purpose: "Holiday Meeting",
       priority: 1,
-      created_by: 1
+      user_codes: [ "new_user" ]
     )
 
     error = assert_raises(GRPC::BadStatus) do
@@ -109,24 +117,20 @@ class ReservationServiceTest < ActiveSupport::TestCase
     end
 
     assert_equal GRPC::Core::StatusCodes::FAILED_PRECONDITION, error.code
-    assert_match /The room is closed on the selected date/, error.details
+    assert_match(/holiday/, error.details)
   end
 
-  # ?ㅽ뙣 耳?댁뒪: 以묐났 ?덉빟
   test "should raise error for overlapping reservation" do
-    # 湲곗〈 ?덉빟: ?섏슂??10:00-11:00
-    # 以묐났 ?쒕룄: ?섏슂??10:30-11:30
     start_time = @booked_day.to_time.change(hour: 10, min: 30)
     end_time = @booked_day.to_time.change(hour: 11, min: 30)
 
-    request = Studyroom::CreateReservationRequest.new(
+    request = RequestMessage.new(
       room_id: @room.id,
-      group_id: 3,
-      start_time: Google::Protobuf::Timestamp.new(seconds: start_time.to_i),
-      end_time: Google::Protobuf::Timestamp.new(seconds: end_time.to_i),
-      purpose: 'Overlapping Meeting',
+      start_time: start_time.iso8601,
+      end_time: end_time.iso8601,
+      purpose: "Overlapping Meeting",
       priority: 1,
-      created_by: 1
+      user_codes: [ "new_user" ]
     )
 
     error = assert_raises(GRPC::BadStatus) do
@@ -134,6 +138,24 @@ class ReservationServiceTest < ActiveSupport::TestCase
     end
 
     assert_equal GRPC::Core::StatusCodes::FAILED_PRECONDITION, error.code
-    assert_match /The requested time slot is already booked/, error.details
+    assert_match(/overlaps/, error.details)
+  end
+
+  test "should raise error when user_codes is empty" do
+    start_time = @operating_day.to_time.change(hour: 14)
+    end_time = @operating_day.to_time.change(hour: 15)
+
+    request = RequestMessage.new(
+      room_id: @room.id,
+      start_time: start_time.iso8601,
+      end_time: end_time.iso8601,
+      purpose: "No users"
+    )
+
+    error = assert_raises(GRPC::BadStatus) do
+      @service.create_reservation(request, nil)
+    end
+
+    assert_equal GRPC::Core::StatusCodes::INVALID_ARGUMENT, error.code
   end
 end

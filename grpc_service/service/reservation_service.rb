@@ -27,7 +27,7 @@ module Bannote
             return nil if str.blank?
 
             if str =~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
-              return Time.zone.strptime(str, "%Y-%m-%dT:%H:%M")
+              return Time.zone.strptime(str, "%Y-%m-%dT%H:%M")
             end
 
             Time.zone.parse(str)

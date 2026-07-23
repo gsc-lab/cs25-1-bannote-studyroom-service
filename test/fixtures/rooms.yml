@@ -3,7 +3,9 @@
 one:
   name: MyString
   capacity: 1
+  maximum_member: 4
 
 two:
   name: MyString
   capacity: 1
+  maximum_member: 4

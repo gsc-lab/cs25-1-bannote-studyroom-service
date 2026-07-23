@@ -34,6 +34,12 @@ module Bannote
                 department_name: request.department_name.to_s.strip.presence,
                 name: request.name,
                 maximum_member: request.maximum_member,
+                # 참고: rooms.status 는 integer 컬럼인데 문자열 "Empty"를 그대로
+                # 넣고 있다. Room 모델에 enum 선언이 없어서 지금은 MySQL이 이
+                # 문자열을 그냥 0으로 강제 변환해 저장하는 것으로 보인다.
+                # 의도한 상태값 목록(Empty/Occupied 등)을 확정해서 Room에
+                # enum :status 를 선언하는 정리가 필요해 보이지만, 기존 데이터의
+                # 의미를 바꿀 수 있는 부분이라 임의로 고치지 않고 코멘트만 남김.
                 status: "Empty",
                 created_by: Current.user_code
               )

@@ -1,3 +1,7 @@
+# 참고: docker-compose.yml 에도 별도의 db 서비스(container_name: studyroom_db,
+# 포트 3307, 내부 네트워크 정의 포함)가 있어서 두 파일이 겹친다. 이 파일은
+# 외부(external) 공유 네트워크에 붙는 "DB만" 띄우는 용도로 보이는데, 실제로
+# 어느 쪽이 지금 쓰이는 구성인지 불확실해서 정리하지 않고 코멘트만 남김.
 services:
   db:
     image: mysql:8.0

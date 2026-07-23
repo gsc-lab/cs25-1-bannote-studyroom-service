@@ -41,6 +41,10 @@
 
   private
 
+  # 참고: rooms 테이블/gRPC RoomService 에는 capacity, department_code,
+  # department_name, status 도 있는데 여기서는 name/maximum_member만 받는다.
+  # 이 REST 컨트롤러가 gRPC 쪽과 별개로 어디까지 필드를 열어줄지 정해진 게
+  # 없어서 우선 기존 동작 그대로 두고 코멘트만 남김.
   def room_params
     params.permit(:name, :maximum_member)
   end

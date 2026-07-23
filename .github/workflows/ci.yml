@@ -40,6 +40,23 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # database.yml이 DB_HOST/DB_USERNAME/DB_PASSWORD/DB_NAME/DB_PORT를
+    # ENV.fetch(기본값 없음)로 요구하기 때문에, 아래처럼 실제 MySQL 서비스와
+    # 해당 env 값들을 넣어주지 않으면 `bin/rails db:test:prepare` 단계에서
+    # 바로 키 누락 에러가 난다.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: true
+          MYSQL_DATABASE: studyroom_service_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     # services:
     #  redis:
     #    image: redis
@@ -62,5 +79,10 @@ jobs:
       - name: Run tests
         env:
           RAILS_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USERNAME: root
+          DB_PASSWORD: ""
+          DB_NAME: studyroom_service_test
           # REDIS_URL: redis://localhost:6379/0
         run: bin/rails db:test:prepare test
