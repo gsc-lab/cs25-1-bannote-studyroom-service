@@ -1,11 +1,19 @@
 FROM ruby:3.2
 
-WORKDIR /rails
-COPY . /rails
+WORKDIR /studyroom_service
 
-RUN apt-get update -qq && apt-get install -y build-essential libpq-dev nodejs default-mysql-client
-RUN gem install bundler rails
+# OS packages 먼저 설치
+RUN apt-get update -qq && \
+    apt-get install -y build-essential default-mysql-client libpq-dev nodejs librdkafka-dev
+
+COPY . /studyroom_service
+
+RUN gem install bundler
 RUN bundle install
 
-EXPOSE 3000
-CMD ["rails", "server", "-b", "0.0.0.0"]
+# grpc-health-probe 설치
+RUN curl -sSL -o /bin/grpc-health-probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/latest/download/grpc-health-probe-linux-amd64 && \
+    chmod +x /bin/grpc-health-probe
+
+EXPOSE 50053
+CMD ["ruby", "grpc_service/server.rb"]

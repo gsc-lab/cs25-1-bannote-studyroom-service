@@ -1,8 +1,38 @@
+# version: v2
+# managed:
+#   enabled: true
+# plugins:
+#   - remote: buf.build/protocolbuffers/ruby
+#     out: app/grpc
+#   - remote: buf.build/grpc/ruby
+#     out: app/grpc
+
+# version: v2
+# managed:
+#   enabled: true
+# plugins:
+#   - remote: buf.build/protocolbuffers/ruby
+#     out: app/grpc
+#     opt:
+#       - paths=source_relative
+#   - remote: buf.build/grpc/ruby
+#     out: app/grpc
+#     opt:
+#       - paths=source_relative
+
 version: v2
 managed:
   enabled: true
+
+inputs:
+  - directory: proto_export   # proto_export 내부 전체를 빌드 대상으로 지정
+
 plugins:
   - remote: buf.build/protocolbuffers/ruby
     out: app/grpc
+    opt:
+      - paths=source_relative
   - remote: buf.build/grpc/ruby
     out: app/grpc
+    opt:
+      - paths=source_relative

@@ -1,181 +1,179 @@
-# frozen_string_literal: true
-
-require 'room_operating_hour/room_operating_hour_pb'
-require 'room_operating_hour/service_pb'
-require 'room_operating_hour/service_services_pb'
-
-require_relative '../../app/models/concerns/current'
-require_relative '../../app/models/concerns/simulated_user_roles'
+﻿# frozen_string_literal: true
 
 module Bannote
   module Studyroomservice
     module Roomoperatinghour
       module V1
-        class RoomOperatingHourServiceHandler < Bannote::Studyroomservice::Roomoperatinghour::V1::RoomOperatingHourService::Service
-          
-          # =========================================
-          # 1. 운영시간 생성
-          # =========================================
-          def create_room_operating_hour(request, _call)
-            authorize!("assistant")
+        class RoomOperatingHourServiceHandler < RoomOperatingHourService::Service
 
-            # 1. gRPC Timestamp → Ruby Time 변환
-            begin
-              opening_time = Time.at(request.opening_time.seconds)
-              closing_time = Time.at(request.closing_time.seconds)
-            rescue
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-                "Invalid Timestamp format for opening_time or closing_time"
-              )
-            end
-
-            # 2. 유효성 검증
-            raise GRPC::BadStatus.new(
-              GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-              "Opening time must be before closing time."
-            ) if opening_time >= closing_time
-
-            raise GRPC::BadStatus.new(
-              GRPC::Core::StatusCodes::NOT_FOUND,
-              "Room with ID #{request.room_id} not found."
-            ) unless ::Room.exists?(request.room_id)
-
-            # 3. DB 저장 (datetime)
-            new_operating_hour = ::RoomOperatingHour.create!(
-              room_id: request.room_id,
-              day_of_week: request.day_of_week,
-              opening_time: opening_time,
-              closing_time: closing_time,
-            )
-
-            # 4. 응답 변환
-            Bannote::Studyroomservice::Roomoperatinghour::V1::CreateRoomOperatingHourResponse.new(
-              room_operating_hour: room_operating_hour_to_proto(new_operating_hour)
-            )
-          rescue ActiveRecord::RecordInvalid => e
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, e.message)
-          end
+          ROLE_PRIORITY = {
+            "student"   => 1,
+            "assistant" => 2,
+            "professor" => 3,
+            "admin"     => 4
+          }.freeze
 
           # =========================================
-          # 2. 단일 조회
+          # 1) 전체 조회 (GetRoomOperatingHours)
           # =========================================
-          def get_room_operating_hour(request, _call)
+          def get_room_operating_hours(request, _call)
             authorize!("student")
 
-            operating_hour = ::RoomOperatingHour.find(request.id)
-            Bannote::Studyroomservice::Roomoperatinghour::V1::GetRoomOperatingHourResponse.new(
-              room_operating_hour: room_operating_hour_to_proto(operating_hour)
-            )
-          rescue ActiveRecord::RecordNotFound
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Room operating hour not found")
-          end
+            room_id = request.room_id
 
-          # =========================================
-          # 3. 목록 조회
-          # =========================================
-          def list_room_operating_hours(request, _call)
-            authorize!("student")
+            hours = ::RoomOperatingHour
+                      .where(room_id: room_id, deleted_at: nil)
+                      .order(:day_of_week)
 
-            operating_hours = ::RoomOperatingHour.all
-            operating_hours = operating_hours.where(room_id: request.room_id) if request.room_id.present?
+            response_hours = hours.map { |h| room_operating_hour_to_proto(h) }
 
-            Bannote::Studyroomservice::Roomoperatinghour::V1::ListRoomOperatingHoursResponse.new(
-              room_operating_hours: operating_hours.map { |oh| room_operating_hour_to_proto(oh) }
+            GetRoomOperatingHoursResponse.new(
+              room_operating_hours: response_hours
             )
           end
 
+
           # =========================================
-          # 4. 수정
+          # 2) 리스트 기반 전체 업데이트 (UpdateRoomOperatingHours)
           # =========================================
-          def update_room_operating_hour(request, _call)
+          def update_room_operating_hours(request, _call)
             authorize!("assistant")
 
-            operating_hour = ::RoomOperatingHour.find(request.id)
+            room_id = request.room_id
+            new_items = request.operating_hours.to_a
 
-            # Timestamp → Time 변환
-            if request.opening_time&.seconds && request.closing_time&.seconds
-              opening_time = Time.at(request.opening_time.seconds)
-              closing_time = Time.at(request.closing_time.seconds)
-
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::INVALID_ARGUMENT,
-                "Opening time must be before closing time."
-              ) if opening_time >= closing_time
+            # ===== 리스트 내부 중복 방지 =====
+            day_list = new_items.map(&:day_of_week)
+            if day_list.size != day_list.uniq.size
+              raise_invalid("Duplicate day_of_week exists in request list")
             end
 
-            operating_hour.update!(
-              room_id: request.room_id.presence || operating_hour.room_id,
-              day_of_week: request.day_of_week.presence || operating_hour.day_of_week,
-              opening_time: opening_time || operating_hour.opening_time,
-              closing_time: closing_time || operating_hour.closing_time
-            )
+            ActiveRecord::Base.transaction do
+              existing = ::RoomOperatingHour
+                           .where(room_id: room_id, deleted_at: nil)
+                           .index_by(&:day_of_week)
 
-            Bannote::Studyroomservice::Roomoperatinghour::V1::UpdateRoomOperatingHourResponse.new(
-              room_operating_hour: room_operating_hour_to_proto(operating_hour)
-            )
-          rescue ActiveRecord::RecordNotFound
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, "Room operating hour not found")
-          rescue ActiveRecord::RecordInvalid => e
-            raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, e.message)
+              incoming_days = new_items.map(&:day_of_week)
+
+              # A. create + update
+
+              new_items.each do |item|
+                validate_day_of_week!(item.day_of_week)
+                validate_operating_time_format!(
+                  item.opening_time.presence,
+                  item.closing_time.presence
+                )
+
+                if existing[item.day_of_week]
+                  record = existing[item.day_of_week]
+                  record.update!(
+                    opening_time: item.opening_time.presence,
+                    closing_time: item.closing_time.presence,
+                    day_maximum_time: item.day_maximum_time.presence
+                  )
+                else
+                  ::RoomOperatingHour.create!(
+                    room_id: room_id,
+                    day_of_week: item.day_of_week,
+                    opening_time: item.opening_time.presence,
+                    closing_time: item.closing_time.presence,
+                    day_maximum_time: item.day_maximum_time.presence
+                  )
+                end
+              end
+
+              # B. delete (요청에서 빠진 요일)
+              existing.each do |dow, record|
+                unless incoming_days.include?(dow)
+                  record.update!(deleted_at: Time.current)
+                end
+              end
+            end
+
+            Google::Protobuf::Empty.new
           end
 
-          # =========================================
-          # 5. 삭제 (Soft delete)
-          # =========================================
-          def delete_room_operating_hour(request, _call)
-            authorize!("admin")
-
-            operating_hour = ::RoomOperatingHour.find(request.id)
-            operating_hour.update!(deleted_at: Time.current)
-
-            Bannote::Studyroomservice::Roomoperatinghour::V1::DeleteRoomOperatingHourResponse.new(
-              success: true,
-              message: "Room operating hour deleted successfully"
-            )
-
-          rescue ActiveRecord::RecordNotFound
-            Bannote::Studyroomservice::Roomoperatinghour::V1::DeleteRoomOperatingHourResponse.new(
-              success: false,
-              message: "Room operating hour not found"
-            )
-          rescue => e
-            Bannote::Studyroomservice::Roomoperatinghour::V1::DeleteRoomOperatingHourResponse.new(
-              success: false,
-              message: "Deletion failed: #{e.message}"
-            )
-          end
 
           # =========================================
-          # 공통 메서드
+          # 유틸 & 검증
           # =========================================
           private
 
-          def authorize!(min_role)
-            unless SimulatedUserRoles.has_authority?(
-              Current.user_id,
-              SimulatedUserRoles::AUTHORITY_LEVELS[min_role]
-            )
-              raise GRPC::BadStatus.new(
-                GRPC::Core::StatusCodes::PERMISSION_DENIED,
-                "Permission denied: Requires #{min_role.capitalize} authority or higher."
-              )
+          def hhmm_to_minutes(hhmm)
+            return nil if hhmm.nil?
+            h, m = hhmm.split(":").map(&:to_i)
+            (h * 60) + m
+          end
+
+          def validate_day_of_week!(dow)
+            unless dow.between?(0, 6)
+              raise_invalid("day_of_week must be between 0 and 6")
             end
           end
 
-          # DB → Proto 변환
-          def room_operating_hour_to_proto(operating_hour)
-            Bannote::Studyroomservice::Roomoperatinghour::V1::RoomOperatingHour.new(
-              id: operating_hour.id,
-              room_id: operating_hour.room_id,
-              day_of_week: operating_hour.day_of_week,
-              # 표시용은 HH:MM 으로 포맷, 실제 전달은 Timestamp
-              opening_time: Google::Protobuf::Timestamp.new(seconds: operating_hour.opening_time.to_i),
-              closing_time: Google::Protobuf::Timestamp.new(seconds: operating_hour.closing_time.to_i),
-              created_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.created_at.to_i),
-              updated_at: Google::Protobuf::Timestamp.new(seconds: operating_hour.updated_at.to_i),
+          def validate_operating_time_format!(opening, closing)
+            opening = opening.presence
+            closing = closing.presence
+
+            return if opening.nil? && closing.nil?
+
+            if opening.nil? && closing.present?
+              raise_invalid("opening_time is required when closing_time is provided")
+            end
+            if closing.nil? && opening.present?
+              raise_invalid("closing_time is required when opening_time is provided")
+            end
+
+            begin
+              start_m = hhmm_to_minutes(opening)
+              end_m = hhmm_to_minutes(closing)
+            rescue
+              raise_invalid("Invalid time format. Expected HH:MM")
+            end
+
+            if start_m.nil? || end_m.nil?
+              raise_invalid("Invalid time format. Expected HH:MM")
+            end
+
+            raise_invalid("opening_time must be before closing_time") if start_m >= end_m
+          end
+
+          # proto 변환
+          def room_operating_hour_to_proto(h)
+            RoomOperatingHour.new(
+              id: h.id,
+              room_id: h.room_id,
+              day_of_week: h.day_of_week,
+              opening_time: h.opening_time,
+              closing_time: h.closing_time,
+              day_maximum_time: h.day_maximum_time,
+              created_at: to_proto_timestamp(h.created_at),
+              updated_at: to_proto_timestamp(h.updated_at),
+              deleted_at: nil
             )
           end
+
+          def to_proto_timestamp(time)
+            return nil if time.nil?
+            Google::Protobuf::Timestamp.new(
+              seconds: time.to_i,
+              nanos: time.nsec
+            )
+          end
+
+          # 에러 유틸
+          def raise_not_found(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::NOT_FOUND, msg); end
+          def raise_invalid(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::INVALID_ARGUMENT, msg); end
+          def raise_precondition(msg); raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::FAILED_PRECONDITION, msg); end
+
+          # 권한 체크
+          def authorize!(required_role)
+            user_role = Current.user_role.to_s
+            unless ROLE_PRIORITY[user_role] && ROLE_PRIORITY[user_role] >= ROLE_PRIORITY[required_role]
+              raise GRPC::BadStatus.new(GRPC::Core::StatusCodes::PERMISSION_DENIED, "Permission denied")
+            end
+          end
+
         end
       end
     end

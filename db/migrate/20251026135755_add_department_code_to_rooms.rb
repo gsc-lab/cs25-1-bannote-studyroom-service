@@ -1,4 +1,4 @@
-class AddDepartmentCodeToRooms < ActiveRecord::Migration[8.0]
+﻿class AddDepartmentCodeToRooms < ActiveRecord::Migration[8.0]
   def change
     add_column :rooms, :department_code, :string
   end

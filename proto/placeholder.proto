@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package reservation.consumer.v1;
-
-import "reservation/service.proto";
-
-

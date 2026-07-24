@@ -1,10 +1,8 @@
 version: v2
+
 modules:
-  # - path: proto_export/user
-  #   name: buf.build/bannote/user-service
-  # - path: proto_export/token
-  #   name: buf.build/bannote/token-service
-  # - path: proto_export/schedule
-  #   name: buf.build/bannote/schedule-service
   - path: proto_export/studyroom
     name: buf.build/bannote/studyroom-service
+
+  - path: proto_export/common-service
+    name: buf.build/bannote/common-service

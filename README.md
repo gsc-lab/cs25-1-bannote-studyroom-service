@@ -1,24 +1,128 @@
-# README
+# Studyroom Service
+> 그룹 기반 스터디룸 예약 관리 백엔드 서비스
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+---
 
-Things you may want to cover:
+## 1. 프로젝트 개요
 
-* Ruby version
+Studyroom Service는  
+**스터디룸을 방 단위로 관리하고, 예약을 안정적으로 처리하기 위한 백엔드 서비스**입니다.
 
-* System dependencies
+단순 예약 기능을 넘어  
+운영 시간, 휴일, 예약 중복 여부와 같은 조건을  
+**도메인 규칙으로 분리하여 관리**하는 것을 목표로 설계되었습니다.
 
-* Configuration
+본 서비스는 MSA 구조의 일부로,  
+다른 서비스에서 발생한 일정 요청을 받아  
+스터디룸 예약의 정합성을 책임집니다.
 
-* Database creation
+---
 
-* Database initialization
+## 2. 기획 배경
 
-* How to run the test suite
+학급 특성상 일본어 특강, 취업 면담 등으로  
+일정 변경이 잦고, 스터디룸이 한정되어 있어  
+예약 충돌이 자주 발생했습니다.
 
-* Services (job queues, cache servers, search engines, etc.)
+기존에는  
+- 일정 관리
+- 스터디룸 사용 현황
+- 개인 일정
 
-* Deployment instructions
+이 분리되어 있어 전체 상황을 파악하기 어려웠고,  
+이를 통합 관리하기 위한 서비스가 필요하다고 판단해  
+본 서비스를 기획했습니다.
 
-* ...
+---
+
+## 3. 서비스 역할
+
+Studyroom Service는 전체 시스템에서  
+**스터디룸 예약의 최종 책임을 가지는 도메인 서비스**입니다.
+
+- 스터디룸(방) 관리
+- 방 단위 예약 관리
+- 예약 가능 여부 검증
+- 다른 서비스의 예약 요청 처리
+
+예약에 대한 모든 유효성 판단은  
+본 서비스에서 수행되도록 설계되었습니다.
+
+---
+
+## 4. 핵심 기능
+
+### 4.1 스터디룸 관리
+- 스터디룸 생성 / 수정 / 삭제
+- 방별 운영 시간 설정
+- 방별 휴일 설정
+
+### 4.2 예약 관리
+- 특정 시간대 예약 생성
+- 예약 조회 (방 기준 / 전체 기준)
+- 예약 취소
+
+### 4.3 예약 검증 로직
+예약 생성 시 다음 조건을 순차적으로 검증합니다.
+
+- 방 존재 여부
+- 운영 시간 내 요청 여부
+- 휴일 여부
+- 기존 예약과의 시간 중복 여부
+
+이를 통해 잘못된 예약 요청을 사전에 차단합니다.
+
+---
+
+## 5. 다른 서비스와의 연동
+
+Studyroom Service는 단독 서비스가 아닌  
+**다른 서비스와의 연동을 전제로 설계**되었습니다.
+
+- Schedule Service에서 일정 생성 시  
+  → 스터디룸 예약 요청 가능
+- 예약 완료 후  
+  → 개인 일정, 그룹 일정 등으로 확장 가능
+
+서비스 간 통신은 **gRPC** 기반으로 구성되었습니다.
+
+---
+
+## 6. 기술 스택
+
+- Language: Ruby
+- Framework: Ruby on Rails
+- Communication: gRPC
+- Database: MySQL
+- Infra: Docker, Docker Compose
+
+Rails의 ActiveRecord를 활용해  
+복잡한 SQL 작성 부담을 줄이고,  
+비즈니스 로직 구현에 집중할 수 있도록 구성했습니다.
+
+---
+
+## 7. 설계에서의 고민
+
+- 예약을 단순 CRUD가 아닌 **도메인 규칙 중심**으로 설계
+- 예약 가능 여부 판단 책임을 명확히 분리
+- 다른 서비스가 존재하더라도  
+  예약 정합성은 Studyroom Service에서 보장하도록 설계
+
+이를 통해  
+**설계가 개발의 방향을 결정한다**는 점을 체감했습니다.
+
+---
+
+## 8. 향후 개선 계획
+
+- Kafka 기반 이벤트 연동
+- 예약 이력 기반 통계 기능
+- Schedule Service와의 자동 예약 연계 고도화
+
+---
+
+## 9. Repository
+
+- GitHub  
+  https://github.com/gsc-lab/cs25-1-bannote-studyroom-service

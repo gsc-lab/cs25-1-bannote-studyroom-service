@@ -1,0 +1,14 @@
+name: Docker Deploy (Dev/Stg)
+
+on:
+  push:
+    branches:
+      - dev
+      - stg
+
+jobs:
+  deploy:
+    uses: gsc-lab/cs25-1-bannote-infra/.github/workflows/shared-service-deploy.yaml@main
+    with:
+      service-name: studyroom-service
+    secrets: inherit

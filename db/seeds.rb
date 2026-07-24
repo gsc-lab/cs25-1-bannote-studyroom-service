@@ -1,4 +1,4 @@
-# db/seeds.rb
+﻿# db/seeds.rb
 
 rooms = [
   { name: "스터디룸 A", capacity: 4, maximum_member: 4, status: 0 },
@@ -38,7 +38,7 @@ puts "✅ RoomOperatingHour seed created successfully!"
 RoomException.find_or_create_by!(
   room_id: Room.first.id,
   holiday_date: "2025-10-25",
-  reason: "정기 점검",
+  reason: "정기 휴관",
   created_by: 1
 )
 

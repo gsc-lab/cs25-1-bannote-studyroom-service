@@ -1,27 +1,20 @@
+# ============================================
+# Database Configuration (Environment-driven)
+# ============================================
+
 default: &default
   adapter: mysql2
   encoding: utf8mb4
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  username: root
-  password: 1234
-  host: db
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", 5) %>
+  username: <%= ENV.fetch("DB_USERNAME") %>
+  password: <%= ENV.fetch("DB_PASSWORD") %>
+  host: <%= ENV.fetch("DB_HOST") %>
+  port: <%= ENV.fetch("DB_PORT") %>
+  database: <%= ENV.fetch("DB_NAME") %>
 
 development:
-  adapter: mysql2
-  encoding: utf8mb4
-  database: studyroom_service_development
-  username: root
-  password: 1234
-  host: db
-
-test:
-  adapter: mysql2
-  encoding: utf8mb4
-  database: studyroom_service_test
-  username: root
-  password: 1234
-  host: db
+  <<: *default
 
 production:
   <<: *default
-  database: studyroom_service_production
+  

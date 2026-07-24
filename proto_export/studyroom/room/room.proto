@@ -19,12 +19,13 @@ enum RoomStatus {
 message Room {
   int64 id = 1;                               // 스터디룸 ID
   string department_code = 2;                 // 학과 코드
-  string name = 3;                            // 스터디룸 이름
-  int32 maximum_member = 4;                   // 최대 인원
-  RoomStatus status = 5;                      // 스터디룸 상태
-  google.protobuf.Timestamp created_at = 6;   // 생성 시각
-  google.protobuf.Timestamp updated_at = 7;   // 수정 시각
-  int64 created_by = 8;                       // 생성자
+  string department_name = 3;                 // 학과 이름
+  string name = 4;                            // 스터디룸 이름
+  int32 maximum_member = 5;                   // 최대 인원
+  RoomStatus status = 6;                      // 스터디룸 상태
+  google.protobuf.Timestamp created_at = 7;   // 생성 시각
+  google.protobuf.Timestamp updated_at = 8;   // 수정 시각
+  int64 created_by = 9;                       // 생성자
 }
 
 // ==========================================
@@ -32,9 +33,9 @@ message Room {
 // ==========================================
 message CreateRoomRequest {
   string department_code = 1;
-  string name = 2;
-  int32 maximum_member = 3;
-  RoomStatus status = 4;
+  string department_name = 2;
+  string name = 3;
+  int32 maximum_member = 4;
 }
 
 message CreateRoomResponse {
@@ -53,12 +54,18 @@ message GetRoomResponse {
 }
 
 // ==========================================
-// LIST (전체 목록)
+// LIST (페이지네이션 추가)
 // ==========================================
-message ListRoomsRequest {}
+message ListRoomsRequest {
+  int32 page = 1;        // 1부터 시작
+  int32 size = 2;   // 리미트 없음
+}
 
 message ListRoomsResponse {
-  repeated Room rooms = 1;
+  repeated Room rooms = 1;   // 해당 페이지 데이터
+  int64 total_count = 2;     // 전체 개수
+  int32 page = 3;            // 현재 페이지
+  int32 size = 4;       // 페이지 크기
 }
 
 // ==========================================
@@ -66,10 +73,10 @@ message ListRoomsResponse {
 // ==========================================
 message UpdateRoomRequest {
   int64 id = 1;
-  string department_code = 2; 
-  string name = 3;
-  int32 maximum_member = 4;
-  RoomStatus status = 5;
+  string department_code = 2;
+  string department_name = 3;
+  string name = 4;
+  int32 maximum_member = 5;
 }
 
 message UpdateRoomResponse {

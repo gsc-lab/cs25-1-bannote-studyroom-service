@@ -2,12 +2,16 @@
 
 one:
   room: one
-  user_name: MyString
-  start_time: 2025-10-08 08:25:06
-  end_time: 2025-10-08 08:25:06
+  code: RES0000001
+  purpose: Team meeting
+  priority: 1
+  start_time: 2025-10-08 08:00:00
+  end_time: 2025-10-08 09:00:00
 
 two:
   room: two
-  user_name: MyString
-  start_time: 2025-10-08 08:25:06
-  end_time: 2025-10-08 08:25:06
+  code: RES0000002
+  purpose: Study session
+  priority: 1
+  start_time: 2025-10-08 10:00:00
+  end_time: 2025-10-08 11:00:00
